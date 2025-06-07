@@ -246,6 +246,7 @@ function sendTelegramMessage (message) {
 
 //gửi log Telegram
 function sendLog (message) {
+  const props = PropertiesService.getScriptProperties();
   const logChannel = props.getProperty("telegram_logsChat") || '-4826732207';
   const payload = {    
     chat_id: logChannel,
