@@ -111,11 +111,13 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "tab":"tên tab hiện tại đúng như trong danh sách",
         "newtab": "tên tab mới nếu khách hàng yêu cầu chuyển giao dịch qua tab mới, rỗng nếu chỉ cầp cập nhật",
         "date":"ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
-        "desc":"miêu tả về giao dịch, ngắn gọn, tối đa 30 ký tự, dựa trên ghi chú hoặc yêu cầu của khách hàng",
+        "desc":"miêu tả về giao dịch, ngắn gọn, tối đa 30 ký tự, dựa trên miêu tả cũ và yêu cầu của khách hàng",
         "amount":"số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
         "location":"nơi phát sinh giao dịch. 3 giá trị thường gặp là Rennes, Nantes, N/A",
         "category":"mục mới theo đúng tên mục như mô tả",
-        "comment":"lời chú thích của Ngân hàng như trong thông báo gốc" hoặc "thêm thủ công" nếu khách hàng tự thêm. Không thay đổi theo yêu cầu.  
+        "comment": 1 trong 2 giá trị dưới đây nếu chưa có lời ghi chú, nếu có lời ghi chú rồi thì giữ nguyên không thay đổi
+         - lời chú thích của Ngân hàng như trong thông báo gốc  
+         - "thêm thủ công" nếu khách hàng tự thêm         
         "row":"số thứ tự của dòng cần cập nhật",
         "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng",
       }

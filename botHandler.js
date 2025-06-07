@@ -36,7 +36,7 @@ function checkTelegramMessages() {
     // Dùng OpenAI để phân tích danh sách ý định 
     const intentDetectionPrompt = generateIntentDetectionPrompt(originalText, replyText);
     const interpretation = detectUserIntentWithOpenAI (intentDetectionPrompt);
-    Logger.log (interpretation);    
+    sendLog (interpretation);    
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const intents = interpretation.intents || [];
@@ -96,7 +96,7 @@ function checkTelegramMessages() {
             }
 
             const promptsSettingsTab = ss.getSheetByName(promptsSettings);          
-            const instruction = detectNewContextWithAI(originalText, replyText, current.comment);
+            const instruction = detectNewContextWithAI(current, originalText, replyText);
 
             if (
               instruction.instructionGroup &&
@@ -108,6 +108,7 @@ function checkTelegramMessages() {
                 instruction.instructionName,
                 instruction.instructionContent,
               ]);
+              sendLog (instruction);
             }
 
             confirmationLines.push(intentObj.confirmation || `✅ Đã cập nhật giao dịch ở tab ${tab}, dòng ${row}`);
@@ -141,16 +142,7 @@ function checkTelegramMessages() {
             ]);
 
             const rowID = lastRow + 1;
-
-            const promptsSettingsTab = ss.getSheetByName(promptsSettings);
-            if (intentObj.instructionGroup && intentObj.instructionName && intentObj.instructionContent) {
-              promptsSettingsTab.appendRow([
-                intentObj.instructionGroup,
-                intentObj.instructionName,
-                intentObj.instructionContent
-              ]);
-            }
-
+            
             confirmationLines.push(intentObj.confirmation || `✏️ Đã thêm *${intentObj.amount} EUR* cho *${intentObj.desc}* vào ${tab}, dòng ${rowID}`);
             break;
           }

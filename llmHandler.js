@@ -68,7 +68,10 @@ function analyseDataWithOpenAI(promptText) {
   const payload = {
     model: "gpt-4.1", 
     input: [
-      { role: "system", content: `Bạn là một chuyên gia tài chính cá nhân đang trao đổi với khách hàng qua Telegram. Mốc thời gian hiện tại là tháng ${currentTime}` },
+      { role: "system", content: `
+      Bạn là một chuyên gia tài chính cá nhân đang trao đổi với khách hàng qua Telegram. 
+      Mốc thời gian hiện tại là tháng ${currentTime}
+      Hãy dựa vào mục tiêu của khách hàng, phân tích thẳng thắng, rõ ràng để giúp khách hoàn thành mục tiêu tài chính cá nhân của mình.`},
       { role: "user", content: promptText }
     ],
     temperature: 0.5
@@ -135,10 +138,14 @@ function detectUserIntentWithOpenAI(promptText) {
 }
 
 //xác định prompt để cải thiện nhận diện
-function detectNewContextWithAI(originalText, replyText, originalBankCmt) {  
+function detectNewContextWithAI(originalTx, originalText, replyText) {  
 
-  const apiKey = OPENAI_TOKEN  
-  userText = `Tin nhắn của bạn: ${originalText}\nPhản hồi của khách hàng: ${replyText}\nGhi chú gốc của ngân hàng: ${originalBankCmt}`  
+  const apiKey = OPENAI_TOKEN    
+  const originalTxDesc = `Đây là giao dịch gốc ngày ${originalTx.date}, miêu tả: ${originalTx.desc}, số tiền: ${originalTx.amount}, nơi phát sinh: ${originalTx.location}, mục phân loại: ${originalTx.category}, ghi chú của ngân hàng: ${originalTx.comment} `;
+  const userText = `Tin nhắn của bạn: ${originalText}\nPhản hồi của khách hàng: ${replyText}\n`
+
+
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
 
   //tạo prompt hoàn cảnh và phân loại
   const familyContext = getFamilyContext ();
@@ -151,14 +158,14 @@ function detectNewContextWithAI(originalText, replyText, originalBankCmt) {
   \n${categoriseInstructions}
   \n${categories}
 
-  Đây là một thông báo giao dịch kèm ghi chú gốc của ngân hàng kèm phàn hồi của khách hàng
-  ${userText}\n
-  Bạn là chuyên gia quản lý tài chính cá nhân nhưng chưa biết hết về hoàn cảnh sử dụng của khách hàng.
+  Đây là thông tin giao dịch gốc ${originalTxDesc}\n
+  Đây là tin nhắn của bạn kèm phàn hồi của khách hàng ${userText}\n  
+
   Hãy 
-  - so sánh giữa tin nhắn gốc, tin phản hồi của của khách hàng và ghi chú gốc của ngân hàng
+  - so sánh giữa tin nhắn gốc, tin phản hồi của của khách hàng và thông tin giao dịch gốc
   - so sánh với các hướng dẫn trong phần Chỉ dẫn phân loại. 
       - Nếu đã tồn tại instructionGroup, instructionName, instructionContent có giá trị tương tự trong phần Hướng dẫn, trả về JSON với giá trị "" cho tất cả các khóa.
-      - Nếu chưa tồn tại chỉ dẫn, ghi lại điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn dựa vào ghi chủ của ngân hàng và trả lại JSON theo cấu trúc sau, không có dấu code block
+      - Nếu chưa tồn tại chỉ dẫn, ghi lại điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn mà không cần hướng dẫn của người dùng và trả lại JSON theo cấu trúc sau, không có dấu code block
       {
         "instructionGroup": có 1 trong 3 giá trị: 
           - "Hoàn cảnh": bổ sung thông tin về hoàn cảnh gia đình như thành phần gia đình, con cái, nhà cửa
@@ -180,7 +187,9 @@ function detectNewContextWithAI(originalText, replyText, originalBankCmt) {
     input: [
       {
         role: "system",
-        content: `Bạn là một chuyên gia tài chính cá nhân. Bạn phân loại các giao dịch của khách hàng và ghi chú những tiêu chí cần thiết để luôn luôn cải thiện giao dịch. Mốc thời gian hiện tại là ${currentMonth}`                
+        content: `Bạn là một chuyên gia tài chính cá nhân. Mốc thời gian hiện tại là ${currentTime}
+        - Bạn phân loại các giao dịch của khách hàng và ghi chú những tiêu chí cần thiết để luôn luôn cải thiện việc phân loại giao dịch. 
+        - Bạn chỉ có quyền phân loại sai 1 lần. Bạn phải ghi chép cụ thể hướng dẫn để đảm bảo lỗi phân loại sai không diễn ra lần nữa mà không cần khách hàng xác nhận.`                
       },
       {
         role: "user",
