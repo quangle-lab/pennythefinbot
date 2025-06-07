@@ -33,9 +33,8 @@ function checkTelegramMessages() {
     // Lấy context (nội dung gốc nếu có)
     const originalText = isReplyToBot ? msg.reply_to_message.text : "";
 
-    // Dùng OpenAI để phân tích danh sách ý định 
-    const intentDetectionPrompt = generateIntentDetectionPrompt(originalText, replyText);
-    const interpretation = detectUserIntentWithOpenAI (intentDetectionPrompt);
+    // Dùng OpenAI để phân tích danh sách ý định     
+    const interpretation = detectUserIntentWithOpenAI (originalText, replyText);
     sendLog (interpretation);    
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -96,7 +95,7 @@ function checkTelegramMessages() {
             }
 
             const promptsSettingsTab = ss.getSheetByName(promptsSettings);          
-            const instruction = detectNewContextWithAI(current, originalText, replyText);
+            const instruction = detectNewContextWithOpenAI(current, originalText, replyText);
 
             if (
               instruction.instructionGroup &&
@@ -171,6 +170,18 @@ function checkTelegramMessages() {
             break;
           }
 
+          case "createBudget": {
+            const { sourceMonth, month } = intentObj;
+            const confirmation = createNewBudget(month, sourceMonth);
+            confirmationLines.push(intentObj.confirmation || confirmation);
+
+            let budgetPrompt = generateBudgetAnalyticsPrompt (month, sourceMonth);  
+            let budgetAnlyticsResp = analyseDataWithOpenAI (budgetPrompt);
+            confirmationLines.push(budgetAnlyticsResp);
+
+            break;
+          }
+
           case "modifyBudget": {
             const { month, changes } = intentObj;
             const lines = [];
@@ -216,12 +227,12 @@ function checkTelegramMessages() {
 //gửi tin nhắn Telegram
 function sendTelegramMessage (message) {
   const props = PropertiesService.getScriptProperties();
-  const debugChannel = props.getProperty("telegram_DebugChat") || '-4847069897';
+  //const debugChannel = props.getProperty("telegram_DebugChat") || '-4847069897';
 
   const payload = {
-    //chat_id: CHAT_ID,
-    //message_thread_id: THREAD_ID,
-    chat_id: debugChannel,
+    chat_id: CHAT_ID,
+    message_thread_id: THREAD_ID,
+    //chat_id: debugChannel,
     parse_mode: `Markdown`,
     text: message,
   };
@@ -235,10 +246,9 @@ function sendTelegramMessage (message) {
 
 //gửi log Telegram
 function sendLog (message) {
-  const payload = {
-    //chat_id: CHAT_ID,
-    //message_thread_id: THREAD_ID,
-    chat_id: '-4826732207',
+  const logChannel = props.getProperty("telegram_logsChat") || '-4826732207';
+  const payload = {    
+    chat_id: logChannel,
     parse_mode: `Markdown`,
     text: message,
   };

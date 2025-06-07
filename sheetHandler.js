@@ -315,12 +315,199 @@ function getExpenseTx (monthText, type) {
   ];
 }
 
+//kiểm tra giao dịch đã tồn tại và xử lý xác nhận thêm mới
+function checkAndConfirmTransaction(transaction) {
+  const { date, amount, description, bankComment, category, group } = transaction;
+
+  // Validate input parameters
+  if (!date || !amount || !description || !group) {
+    return {
+      exists: false,
+      needsConfirmation: false,
+      error: "❌ Thiếu thông tin bắt buộc: date, amount, description, group"
+    };
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(group);
+
+  if (!sheet) {
+    return {
+      exists: false,
+      needsConfirmation: false,
+      error: `❌ Không tìm thấy sheet "${group}"`
+    };
+  }
+
+  // Get all data from the sheet
+  const data = sheet.getDataRange().getValues();
+  const timezone = Session.getScriptTimeZone();
+
+  // Parse input date for comparison
+  let inputDate;
+  try {
+    // Handle different date formats
+    if (typeof date === 'string') {
+      const dateParts = date.split('/');
+      if (dateParts.length === 3) {
+        // DD/MM/YYYY format
+        inputDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+      } else {
+        inputDate = new Date(date);
+      }
+    } else {
+      inputDate = new Date(date);
+    }
+  } catch (e) {
+    return {
+      exists: false,
+      needsConfirmation: false,
+      error: `❌ Định dạng ngày không hợp lệ: ${date}`
+    };
+  }
+
+  // Check for existing transactions (skip header row)
+  const existingRows = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const rowDate = row[0]; // Column A: Date
+    const rowDesc = row[1]; // Column B: Description
+    const rowAmount = row[2]; // Column C: Amount
+    const rowLocation = row[3]; // Column D: Location
+    const rowCategory = row[4]; // Column E: Category
+    const rowBankComment = row[5]; // Column F: Bank Comment
+
+    // Compare dates
+    let rowDateFormatted;
+    try {
+      rowDateFormatted = Utilities.formatDate(new Date(rowDate), timezone, "dd/MM/yyyy");
+      const inputDateFormatted = Utilities.formatDate(inputDate, timezone, "dd/MM/yyyy");
+
+      // Check for potential duplicates based on multiple criteria
+      const dateMatch = rowDateFormatted === inputDateFormatted;
+      const amountMatch = Math.abs(parseFloat(rowAmount) - parseFloat(amount)) < 0.01; // Allow small floating point differences
+      const descMatch = rowDesc && description &&
+        (rowDesc.toLowerCase().includes(description.toLowerCase()) ||
+         description.toLowerCase().includes(rowDesc.toLowerCase()));
+      const bankCommentMatch = bankComment && rowBankComment &&
+        (rowBankComment.toLowerCase().includes(bankComment.toLowerCase()) ||
+         bankComment.toLowerCase().includes(rowBankComment.toLowerCase()));
+
+      // Consider it a potential duplicate if:
+      // 1. Same date AND same amount, OR
+      // 2. Same date AND similar description, OR
+      // 3. Same amount AND same bank comment (if available)
+      if ((dateMatch && amountMatch) ||
+          (dateMatch && descMatch) ||
+          (amountMatch && bankCommentMatch)) {
+        existingRows.push({
+          rowNumber: i + 1,
+          date: rowDateFormatted,
+          description: rowDesc,
+          amount: rowAmount,
+          location: rowLocation,
+          category: rowCategory,
+          bankComment: rowBankComment
+        });
+      }
+    } catch (e) {
+      // Skip rows with invalid dates
+      continue;
+    }
+  }
+
+  // Return results
+  if (existingRows.length > 0) {
+    let message = `🔍 Tìm thấy *${existingRows.length}* giao dịch tương tự trong *${group}*:\n\n`;
+    existingRows.forEach((row, index) => {
+      message += `- *Dòng ${row.rowNumber}*: ${row.date} - ${row.description} - €${row.amount} - ${row.category}\n`;
+    });
+    message += `\n*📝Giao dịch mới*: ${Utilities.formatDate(inputDate, timezone, "dd/MM/yyyy")} - ${description} - ${amount} - ${category || 'N/A'}\n\n`;
+    message += `❓Bạn có muốn thêm giao dịch này không?`;
+
+    return {
+      exists: true,
+      needsConfirmation: true,
+      existingRows: existingRows,
+      message: message,
+      group: group,
+      newTransaction: {
+        date: inputDate,
+        description: description,
+        amount: amount,
+        location: transaction.location || 'N/A',
+        category: category || 'Khác',
+        bankComment: bankComment || ''
+      }
+    };
+  } else {
+    return {
+      exists: false,
+      needsConfirmation: true,
+      message: `🔍 Không tìm thấy giao dịch tương tự trong "${group}".\n`,
+      group: group,
+      newTransaction: {
+        date: inputDate,
+        description: description,
+        amount: amount,
+        location: transaction.location || 'N/A',
+        category: category || 'Khác',
+        bankComment: bankComment || ''
+      }
+    };
+  }
+}
+
+//thêm giao dịch sau khi đã xác nhận
+function addConfirmedTransaction(sheetName, transactionData) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy sheet "${sheetName}"`
+      };
+    }
+
+    const { type, date, description, amount, location, category, bankComment } = transactionData;
+
+    // Add the transaction to the sheet
+    const lastRow = sheet.getLastRow();
+    sheet.appendRow([
+      date,
+      description,
+      amount,
+      location,
+      category,
+      bankComment
+    ]);
+
+    const newRowNumber = lastRow + 1;    
+
+    return {
+      success: true,
+      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}, dòng ${newRowNumber}_`,
+      rowNumber: newRowNumber,
+      sheetName: sheetName
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi thêm giao dịch: ${error.toString()}`
+    };
+  }
+}
+
+
 //lấy số dư hiện tại của Quỹ -- gia đình (rainy), mục đích (target) hoặc tiết kiệm (saving)
 function getFundBalances (type) {
 //TODO
 }
 
-//lấy dữ liệu có/nợ của quỹ của tháng monnthText theo type -- gia đình (rainy), mục đích (target) hoặc tiết kiệm (saving)
+//lấy dữ liệu có/nợ của quỹ của tháng monthText theo type -- gia đình (rainy), mục đích (target) hoặc tiết kiệm (saving)
 function getFundTx (monthText, type) {
 //TODO
 }

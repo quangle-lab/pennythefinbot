@@ -60,6 +60,8 @@ function generateIntentDetectionPrompt (originalText, replyText) {
   const categoriseInstructions = getCategoriseInstructions ();
   const budgetInstructions = getBudgetInstructions ();
   const categories = getTxCat ();
+
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
   
   let intentDetectionPrompt = `
   ${familyContext}
@@ -94,9 +96,10 @@ function generateIntentDetectionPrompt (originalText, replyText) {
             1/ intent trong nhóm quỹ gia đình, mục Phát sinh, số tiền 200 EUR
             2/ intent trong nhóm chi phí biến đổi, mục Mèo, số tiền 200 EUR
   Trả về 1 danh sách sau dưới dạng JSON, không có dấu code block.
-  "intents": [//mảng các intent được miêu tả dưới đây
+  {"intents": [
+    //mảng các intent được miêu tả dưới đây
     {"intent": "",   }    
-  ] 
+  ]} 
 
   Cho mỗi intent, trả lại JSON theo cấu trúc sau, không có dấu code block
     - Yêu cầu báo cáo 
@@ -106,6 +109,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "year": năm xác định được từ tin nhắn khách hàng "" nếu ko xác định được
       } 
     - Yêu cầu thêm mới, cập nhật hoặc xóa giao dịch. 
+      Có thể có những giao dịch bị trùng lắp từ email, bạn sẽ hỏi khách hàng có muốn thêm hay không. Nếu khách hàng có ý định bỏ qua, trả về intent=others và bỏ qua giao dịch.
       {
         "intent":"addTx" hoặc "intent": "modifyTx" hoặc "intent":"deleteTx",
         "tab":"tên tab hiện tại đúng như trong danh sách",
@@ -119,6 +123,13 @@ function generateIntentDetectionPrompt (originalText, replyText) {
          - lời chú thích của Ngân hàng như trong thông báo gốc  
          - "thêm thủ công" nếu khách hàng tự thêm         
         "row":"số thứ tự của dòng cần cập nhật",
+        "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng",
+      }
+    - Yêu cầu tạo dự toán cho tháng mới
+      {
+        "intent":"createBudget", 
+        "sourceMonth":"tháng/năm nguồn dữ liệu để tạo dự toán mới theo định dạnh MM/yyyy. Nếu khách hàng không nói tháng, mặc định là tháng hiện tại.",
+        "month":"tháng/năm dự toán theo định dạnh MM/yyyy. Nếu khách hàng không nói tháng, mặc định là tháng tới",
         "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng",
       }
     - Yêu cầu thay đổi dự toán: danh sách các thay đổi cần áp dụng cho dự toán. Nếu khách hàng không phản đối các điều chỉnh trong tin nhắn của bạn, gộp luôn các thay đổi đó vào danh sách.
@@ -145,7 +156,11 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "note:"ghi chú của bạn về ý định của khách hàng để có thể hỗ trợ tốt hơn lần sau"
       }.  
     `
-  return intentDetectionPrompt;
+  return {
+    systemMessage: `Bạn là một cố vấn tài chính cá nhân phiên bản 0.6 đang trao đổi với khách hàng qua Telegram và Email. 
+    Nếu không rõ hoặc thiếu thông tin giao dịch, hãy trao đổi với khách hàng để làm rõ thêm, tránh hiểu nhầm ý định của khách hàng.
+    Mốc thời gian hiện tại là tháng ${currentTime}.`, 
+    userMessage: intentDetectionPrompt};
 }
 
 //prompt hoàn cảnh phân loại chi tiêu
@@ -228,6 +243,7 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
 
   const contextPrompt = generateContextExpensePrompt ();
   const currentDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
 
   switch (dataSource) {
     case "dashboard": {
@@ -259,6 +275,7 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
         *🤯Mục vượt dự chi*
           Cho mỗi nhóm, nêu các mục vượt dự chi và số tiền vượt. Nêu bật bằng emoji ⚠️(vượt mức dưới 5%) hoặc ‼️(nghiêm trọng -- vượt rất xa dự tính)
         =====
+        *🎯Mục tiêu*: phân tích tình hình chi tiêu hiện tại và khả năng hoàn thành mục tiêu
 
         Yêu cầu
         - Giới hạn trong 200 ký tự
@@ -286,7 +303,11 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
       expenseAnalyticsPrompt = getDashboardData (monthText);
     }
   }
-  return expenseAnalyticsPrompt;
+  return {         
+    systemMessage: `Bạn là một chuyên gia tài chính cá nhân đang trao đổi với khách hàng qua Telegram. 
+      Mốc thời gian hiện tại là tháng ${currentTime}
+      Hãy dựa vào mục tiêu của khách hàng, phân tích thẳng thắng, rõ ràng để giúp khách hoàn thành mục tiêu tài chính cá nhân của mình.`, 
+    userMessage: expenseAnalyticsPrompt };
 }
 
 //prompt phân tích dự toán theo tháng
@@ -294,7 +315,7 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
   var budgetAnalyticsPrompt = ""; 
 
   const contextPrompt = generateContextBudgetPrompt ();
-  const currentDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
   //lấy budget tháng kế tiếp
   const budgetData = getBudgetData (nextMonthText); 
@@ -327,7 +348,7 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
         - 🎯Số dư quỹ mục tiêu: tổng số thực tế và chênh lệch
         
       *💶Dự toán tháng ${nextMonthText}*      
-       - <tên mục>:  <số tiền đề nghị>. Giải thích lí do của đề nghị tăng hay giảm so với mức dự toán cũ (ngoại trừ thu nhập).      
+       - <tên mục>:  <số tiền đề nghị>. Dựa trên mục tiêu tài chính trong hoàn cảnh, giải thích lí do của đề nghị tăng hay giảm so với mức dự toán cũ (ngoại trừ thu nhập).      
         
     Yêu cầu trình bày
       - Giới hạn trong 250 ký tự
@@ -343,11 +364,93 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
             [inline mention of a user](tg://user?id=123456789)  
   `;
 
-  return budgetAnalyticsPrompt;
+  return {         
+    systemMessage: `Bạn là một chuyên gia tài chính cá nhân đang trao đổi với khách hàng qua Telegram. 
+      Mốc thời gian hiện tại là tháng ${currentTime}
+      Tuân thủ chặt chẽ các yêu cầu chỉ dẫn dự toán nhằm hạn chế phát sinh.`, 
+    userMessage: budgetAnalyticsPrompt };
 }
 
+//prompt phân loại giao dịch từ email
+function generateClassifyTransactionPrompt(subject, body) {
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
 
-//TODO: prompt phân tích tình hình quỹ dựa trên mục tiêu trong target, dataSource có thể là: rainyFund, targetFund, saving
-function generateFundAnalyticsPrompt(monthText, target, dataSource) {
-  //TODO
+  //tạo prompt hoàn cảnh và phân loại
+  const familyContext = getFamilyContext();
+  const catInstructions = getCategoriseInstructions();
+  const catPrompt = getTxCat();
+
+  let mainPrompt = `
+  ${familyContext}
+  \n${catInstructions}
+  \n${catPrompt}
+
+  - Tiêu đề email: ${subject}
+  - Nội dung email: ${body}
+
+  Trả về kết quả dưới dạng JSON 9 khóa sau, không có dấu code block, không có lời giải thích:
+    - group: tên tab cần thêm giao dịch đúng như trong danh sách
+    - category: mục theo đúng tên mục như mô tả
+    - type: có 2 giá trị "🤑Thu" hoặc "💸Chi"
+    - date: ngày phát sinh giao dịch theo định dạng DD/MM/YYYY
+    - desc: ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự
+    - amount: số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)
+    - location: thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A
+    - bankcomment: trích chú thích Ngân hàng, chỉ ghi thông tin địa điểm phát sinh giao dịch
+  `;
+
+  return {
+    systemMessage: `Bạn là một cố vấn tài chính cá nhân. Bạn đang đọc email thông báo giao dịch của ngân hàng để phân loại giúp khách hàng. Mốc thời gian hiện tại là  ${currentTime}`,
+    userMessage: mainPrompt
+  };
+}
+
+//prompt xác định ngữ cảnh mới để cải thiện nhận diện
+function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
+
+  const originalTxDesc = `Đây là giao dịch gốc ngày ${originalTx.date}, miêu tả: ${originalTx.desc}, số tiền: ${originalTx.amount}, nơi phát sinh: ${originalTx.location}, mục phân loại: ${originalTx.category}, ghi chú của ngân hàng: ${originalTx.comment} `;
+  const userText = `Tin nhắn của bạn: ${originalText}\nPhản hồi của khách hàng: ${replyText}\n`;
+
+  //tạo prompt hoàn cảnh và phân loại
+  const familyContext = getFamilyContext();
+  const categoriseInstructions = getCategoriseInstructions();
+  const categories = getTxCat();
+
+  let mainPrompt = `
+  Hướng dẫn:
+  \n${familyContext}
+  \n${categoriseInstructions}
+  \n${categories}
+
+  Đây là thông tin giao dịch gốc ${originalTxDesc}\n
+  Đây là tin nhắn của bạn kèm phàn hồi của khách hàng ${userText}\n
+
+  Hãy
+  - so sánh giữa tin nhắn gốc, tin phản hồi của của khách hàng và thông tin giao dịch gốc
+  - so sánh với các hướng dẫn trong phần Chỉ dẫn phân loại.
+      - Nếu đã tồn tại instructionGroup, instructionName, instructionContent có giá trị tương tự trong phần Hướng dẫn, trả về JSON với giá trị "" cho tất cả các khóa.
+      - Nếu chưa tồn tại chỉ dẫn, ghi lại điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn mà không cần hướng dẫn của người dùng và trả lại JSON theo cấu trúc sau, không có dấu code block
+      {
+        "instructionGroup": có 1 trong 3 giá trị:
+          - "Hoàn cảnh": bổ sung thông tin về hoàn cảnh gia đình như thành phần gia đình, con cái, nhà cửa
+          - "Chỉ dẫn phân loại": bổ sung thông tin để việc phân loại tốt hơn như nơi phát sinh giao dịch,các địa điểm, cửa hàng và các mục tương ứng
+          - "Chỉ dẫn dự toán": bổ sung thông tin để việc phân loại tốt hơn như nơi phát sinh giao dịch, các địa điểm, cửa hàng và các mục tương ứng
+        "instructionName": tên của topic, ví dụ:
+            Hoàn cảnh: Gia đinh, con cái, xe, thú cưng, thói quen sống
+            Chỉ dẫn phân loại: hướng dẩn để cải thiện phân loại dựa trên phần hồi của khách hàng, ghi chú gốc của ngân hàng
+        "instructionContent": điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn
+        Ví dụ:
+          "instructionGroup":"Chỉ dẫn phân loại"
+          "instructionName":"Hoàn tiền bảo hiểm"
+          "instructionContent":"GENERATION là tiền hoàn bảo hiểm, ghi vào mục Thu trong Quỹ gia đình"
+      }
+  `;
+
+  return {
+    systemMessage: `Bạn là một chuyên gia tài chính cá nhân. Mốc thời gian hiện tại là ${currentTime}
+        - Bạn phân loại các giao dịch của khách hàng và ghi chú những tiêu chí cần thiết để luôn luôn cải thiện việc phân loại giao dịch.
+        - Bạn chỉ có quyền phân loại sai 1 lần. Bạn phải ghi chép cụ thể hướng dẫn để đảm bảo lỗi phân loại sai không diễn ra lần nữa mà không cần khách hàng xác nhận.`,
+    userMessage: mainPrompt
+  };
 }

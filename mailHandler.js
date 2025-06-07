@@ -12,26 +12,40 @@ function processBankAlerts() {
       const subject = message.getSubject();    
 
       // Gọi OpenAI để phân loại thông minh tab, mục, số tiền, nơi phát sinh giao dịch, ghi chú, ghi của ngân hàng, ngày giao dịch
-      const aiResult = classifyTransactionWithAI(subject, body);
-      const tabName = aiResult.tab || '🛒 Chi phí biến đổi';
+      const aiResult = classifyTransactionWithOpenAI(subject, body);
+      const groupTx = aiResult.group || '🛒 Chi phí biến đổi';
       const typeTx = aiResult.type || 'Thu'
       const dateTx = aiResult.date || '';
       const descTx = aiResult.desc || '';      
       const amountTx = aiResult.amount || '0';      
       const locationTx = aiResult.location || 'N/A';
       const categoryTx = aiResult.category || 'Khác';
-      const bankcommentTx = aiResult.bankcomment || '';          
+      const bankcommentTx = aiResult.bankcomment || '';
+      
+      //kiếm tra xem giao dịch có tồn tại chưa
+      const tx = {
+        date: dateTx,
+        amount: amountTx,
+        description: descTx,
+        bankComment: bankcommentTx,
+        category: categoryTx,
+        group: groupTx, 
+        type: typeTx,
+        location: locationTx
+      };
 
-      // Ghi vào tab tương ứng
-      const targetSheet = sheet.getSheetByName(tabName);
-      if (targetSheet) {
-        const lastRow = targetSheet.getLastRow();
-        targetSheet.appendRow([dateTx, descTx, amountTx, locationTx, categoryTx, bankcommentTx]);        
-        rowID = lastRow+1;
-        
-        //gửi thông báo Telegram
-        const message = `${typeTx} *${amountTx} EUR* cho *${descTx}*\n✏️_Ghi vào ${tabName}, mục ${categoryTx}, dòng ${rowID}_\n`;
-        sendTelegramMessage (message);
+      const checkResult = checkAndConfirmTransaction(tx);
+      if (checkResult.exists) {
+        //gửi thông báo Telegram để xác nhận
+        sendTelegramMessage (checkResult.message);
+      } else {
+        //thêm mới giao dịch
+        const addResult = addConfirmedTransaction(groupTx, tx);      
+        sendTelegramMessage (addResult.message);  
+        if (!addResult.success) {
+          sendTelegramMessage (addResult.error);
+          continue;
+        }
       }
 
       // Đánh dấu đã xử lý
