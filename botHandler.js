@@ -227,21 +227,30 @@ function checkTelegramMessages() {
 //gửi tin nhắn Telegram
 function sendTelegramMessage (message) {
   const props = PropertiesService.getScriptProperties();
-  //const debugChannel = props.getProperty("telegram_DebugChat") || '-4847069897';
+  const debugChannel = props.getProperty("telegram_DebugChat") || '-4847069897';
+  const debugMode = props.getProperty("debug_Mode") || 'off';
 
-  const payload = {
-    chat_id: CHAT_ID,
-    message_thread_id: THREAD_ID,
-    //chat_id: debugChannel,
-    parse_mode: `Markdown`,
-    text: message,
-  };
+  var payload = {
+      chat_id: CHAT_ID,
+      message_thread_id: THREAD_ID,   
+      parse_mode: `Markdown`,
+      text: message,
+  }
+  if (debugMode === 'on') {
+    payload = {
+      chat_id: debugChannel,
+      parse_mode: `Markdown`,
+      text: message,
+    }
+  }
+
   var response = UrlFetchApp.fetch(`${TELEGRAM_API_URL}/sendMessage`, {
-    method: 'POST',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  });  
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    return;
 }
 
 //gửi log Telegram
