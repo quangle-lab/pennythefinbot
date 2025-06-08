@@ -163,85 +163,14 @@ function generateIntentDetectionPrompt (originalText, replyText) {
     userMessage: intentDetectionPrompt};
 }
 
-//prompt hoàn cảnh phân loại chi tiêu
-function generateContextExpensePrompt() {
-  const props = PropertiesService.getScriptProperties();
-  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return "";
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const rows = data.slice(1);
-
-  const contextMap = new Map (); // Nhóm -> array of lines
-
-  rows.forEach(([nhom, ten, noidung]) => {
-    if (!nhom || !ten || !noidung) return;
-    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
-    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
-  });
-
-  const parts = [];
-
-  if (contextMap.has("Hoàn cảnh")) {
-    parts.push("🏠 Hoàn cảnh hộ gia đình:");
-    parts.push(...contextMap.get("Hoàn cảnh"));
-  }
-
-  if (contextMap.has("Chỉ dẫn phân loại")) {
-    parts.push("🔍 Hướng dẫn phân loại giao dịch:");
-    parts.push(...contextMap.get("Chỉ dẫn phân loại"));
-  }
-
-  let contextPrompt = parts.join("\n");
-  return contextPrompt;
-}
-
-//prompt hoàn cảnh phân loại dự toán
-function generateContextBudgetPrompt() {
-  const props = PropertiesService.getScriptProperties();
-  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return "";
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const rows = data.slice(1);
-
-  const contextMap = new Map (); // Nhóm -> array of lines
-
-  rows.forEach(([nhom, ten, noidung]) => {
-    if (!nhom || !ten || !noidung) return;
-    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
-    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
-  });
-
-  const parts = [];
-
-  if (contextMap.has("Hoàn cảnh")) {
-    parts.push("🏠 Hoàn cảnh hộ gia đình:");
-    parts.push(...contextMap.get("Hoàn cảnh"));
-  }
-
-  if (contextMap.has("Chỉ dẫn dự toán")) {
-    parts.push("💶 Hướng dẫn dự toán:");
-    parts.push(...contextMap.get("Chỉ dẫn dự toán"));
-  }
-
-  let contextPrompt = parts.join("\n");  
-  return contextPrompt;
-}
-
 //prompt phân tích chi tiêu, dataSource có thể là: dashboard, fixEx, varEx
 function generateExpenseAnalyticsPrompt(monthText, dataSource) {
   var expenseAnalyticsPrompt = ""; 
 
-  const contextPrompt = generateContextExpensePrompt ();
+  //tạo prompt hoàn cảnh và phân loại
+  const familyContext = getFamilyContext();
+  const catInstructions = getCategoriseInstructions();
+
   const currentDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
 
@@ -249,10 +178,16 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
     case "dashboard": {
       monthDashboardData = getDashboardData (monthText);
       expenseAnalyticsPrompt = `        
-        Hoàn cảnh như sau:\n${contextPrompt}.
-        \nBáo cáo tài chính tháng:\n${monthDashboardData}                
+        Hoàn cảnh gia đình:\n${familyContext}.
+        \nHướng dẫn phân loại:\n${catInstructions}.
+        \nBáo cáo tài chính tháng:\n
+        - Mỗi nhóm bao gồm các mục, ngăn với nhau bằng dấu |, chứa các thông tin lần lượt là Mục, Dự đoán, Thực Tế, Chênh lệch.
+        - Cuối mỗi nhóm, dòng TỔNG chứa tổng dự đoán, tổng thực tế và tổng chênh lệch 
+
+        ${monthDashboardData}                
 
         Dựa trên các thông tin trên, hãy trả về nội dung theo cấu trúc sau
+        =====
         *Báo cáo chi tiêu tháng ${monthText}*        
         _Tính đến ngày ${currentDate}_
 
@@ -268,8 +203,9 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
             - thực chi
             - còn lại nếu dương, vượt nếu âm. Nêu bật bằng emoji ⚠️(vượt mức dưới 5%) hoặc ‼️(nghiêm trọng -- vượt rất xa dự tính)
         
-        🛟Số dư quỹ gia đình
-        🎯Số dư quỹ mục tiêu
+        - 🛟Thu vào quỹ gia đình: xem hàng TỔNG Thực Tế trong quỹ gia đình (nếu dư thì tốt, còn lại thì xấu)
+        - 🎯Thu vào quỹ mục đích: xem hàng TỔNG Thực Tế trong quỹ mục đích (nếu dư thì tốt, còn lại thì xấu)
+        - 🫙Thu vào tiết kiệm: xem hàng TỔNG Thực Tế trong tiết kiệm (nếu dư thì tốt, còn lại thì xấu)
 
         =====
         *🤯Mục vượt dự chi*
@@ -314,7 +250,10 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
 function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
   var budgetAnalyticsPrompt = ""; 
 
-  const contextPrompt = generateContextBudgetPrompt ();
+  //tạo prompt hoàn cảnh và phân loại
+  const familyContext = getFamilyContext();
+  const budgetInstructions = getBudgetInstructions();
+
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
   //lấy budget tháng kế tiếp
@@ -324,8 +263,8 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
   const dashboardData = getDashboardData (thisMonthText);
   
   budgetAnalyticsPrompt = `
-    \nHoàn cảnh gia đình như sau:
-    \n${contextPrompt}
+    \nHoàn cảnh gia đình như sau:\n${familyContext}
+    \nChỉ dẫn dự toán:\n${budgetInstructions}
     \n${dashboardData}    
     \n${budgetData}
             
@@ -343,9 +282,9 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
         - các mục chênh lệch lớn
         - lưu ý xuống dòng cho từng mục và dùng đúng emoji
         
-        - 🛟Số dư quỹ gia đình: tổng số thực tế và chênh lệch
-        
-        - 🎯Số dư quỹ mục tiêu: tổng số thực tế và chênh lệch
+        - 🛟Thu vào quỹ gia đình: tổng số thực tế và chênh lệch        
+        - 🎯Thu vào quỹ mục đích: tổng số thực tế và chênh lệch
+        - 🫙Thu vào tiết kiệm: tổng số thực tế và chênh lệch
         
       *💶Dự toán tháng ${nextMonthText}*      
        - <tên mục>:  <số tiền đề nghị>. Dựa trên mục tiêu tài chính trong hoàn cảnh, giải thích lí do của đề nghị tăng hay giảm so với mức dự toán cũ (ngoại trừ thu nhập).      

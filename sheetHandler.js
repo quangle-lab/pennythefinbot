@@ -120,11 +120,15 @@ function getDashboardData (monthText) {
 
     let section = `📊 ${label}:\n`;
 
-    values.forEach(([muc, dudoan, thucte]) => {
-      if (muc && dudoan && thucte != null) {
-        roundedDuDoan = Math.round(dudoan * 100) / 100;
-        roundedThucTe = Math.round(thucte * 100) / 100;
-        section += `- ${muc}|${roundedDuDoan}|${roundedThucTe}\n`;
+    values.forEach(([muc, dudoan, thucte, chenhlech], index) => {
+      if (index===0) return;      
+      if (muc!==null && muc!=="" && dudoan!==null && thucte!==null && chenhlech!==null) {
+        if (index >1) {
+          dudoan = Math.round(dudoan * 100) / 100;
+          thucte = Math.round(thucte * 100) / 100;
+          chenhlech = Math.round(chenhlech * 100) / 100;
+        }
+        section += `- ${muc}|${dudoan}|${thucte}|${chenhlech}\n`;
       }
     });
 
