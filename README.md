@@ -1,9 +1,9 @@
-## Pre-requistes:
+## Pre-requistes
 - Google Spreadsheet with the correct structure (c.f. template)
 - Telegram bot with the privacy turned off to read the group messages freely
 - OpenAI account with the API key
 
-## AppsScripts project setting
+## AppsScripts project settings
 - debug_Mode: on to send replies to the main channel, off to the debug channel
 - sheet_ContextConfig: the sheet name where the context and instruction are stored for prompts building
 - sheet_txCatConfig: the sheet name where the transaction categories are stored
