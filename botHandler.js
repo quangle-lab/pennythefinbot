@@ -152,7 +152,7 @@ function checkTelegramMessages() {
               monthText = `${intentObj.month}/${intentObj.year}`;
             }
 
-            const dashboardPrompt = generateExpenseAnalyticsPrompt(monthText, "dashboard");
+            const dashboardPrompt = generateExpenseAnalyticsPrompt(replyText, monthText, "dashboard");
             const result = analyseDataWithOpenAI(dashboardPrompt);
             confirmationLines.push(intentObj.confirmation || result);
             break;
