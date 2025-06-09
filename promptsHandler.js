@@ -457,34 +457,34 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
 
   **Cấu trúc phản hồi:**
 
-  🔍 **Phân tích khả năng chi trả cho "${item}" - ${amount}**
+  *🔍Phân tích khả năng chi trả cho "${item}" - ${amount}*
   _Ngày phân tích: ${currentTime}_
 
-  **💡 Kết luận:** [CÓ THỂ CHI TRẢ / CẦN CÂN NHẮC / KHÔNG NÊN CHI TRẢ]
+  *💡Kết luận:* [CÓ THỂ CHI TRẢ / CẦN CÂN NHẮC / KHÔNG NÊN CHI TRẢ]*
 
-  **📊 Phân tích chi tiết:**
+  *📊Phân tích chi tiết:*
 
-  1. **Tình hình ngân sách hiện tại:**
+  *1. Tình hình ngân sách hiện tại:*
      - Phân tích mức độ sử dụng ngân sách tháng hiện tại
      - Đánh giá khả năng dư thừa trong nhóm chi phí tương ứng
      - So sánh với dự toán tháng tới
 
-  2. **Tác động đến quỹ:**
+  *2. Tác động đến quỹ:*
      - Đánh giá tác động đến số dư các quỹ
      - Khuyến nghị quỹ nào nên sử dụng (nếu có)
      - Tác động đến mục tiêu tài chính dài hạn
 
-  3. **Phương án thực hiện:**
+  *3. Phương án thực hiện:*
      - Thời điểm tối ưu để chi trả
      - Cách thức chi trả (từ quỹ nào, hay điều chỉnh ngân sách)
      - Các biện pháp bù đắp (nếu cần)
 
-  **⚠️ Lưu ý và khuyến nghị:**
+  *⚠️Lưu ý và khuyến nghị:*
   - Đưa ra lời khuyên cụ thể dựa trên hoàn cảnh gia đình
   - Đề xuất các phương án thay thế (nếu có)
   - Cảnh báo về rủi ro tài chính (nếu có)
 
-  **🎯 Kế hoạch hành động:**
+  *🎯Kế hoạch hành động:*
   - Các bước cụ thể khách hàng nên thực hiện
   - Điều chỉnh ngân sách cần thiết
   - Theo dõi và đánh giá sau khi chi trả
@@ -494,7 +494,12 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
   - Sử dụng emoji phù hợp để làm nổi bật
   - Đưa ra con số cụ thể và tính toán rõ ràng
   - Dùng định dạng markdown cho Telegram
-  - Giới hạn trong 300 từ, tập trung vào những điểm quan trọng nhất
+  - Giới hạn trong 250 từ, tập trung vào những điểm quan trọng nhất
+  - Dùng định dạng markdown cho Telegram, không có dấu code block
+            *bold text*
+            _italic text_
+            [inline URL](http://www.example.com/)
+            [inline mention of a user](tg://user?id=123456789)
   `;
 
   return {

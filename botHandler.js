@@ -168,6 +168,8 @@ function checkTelegramMessages() {
           case "affordTest": {
             const { item, amount, category, group, timeframe } = intentObj;
 
+            sendTelegramMessage (intentObj.confirmation);
+
             //gọi hàm check khả năng mua
             let affordabilityCheck = checkAffordabilityWithOpenAI(item, amount, category, group, timeframe);       
             confirmationLines.push(affordabilityCheck);   
