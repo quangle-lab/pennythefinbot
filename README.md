@@ -16,13 +16,21 @@
 ## Features
 ### Description
 The Telegram bot enables a household to manage their budget semi-automatically through email synchronisation and manual input. 
-*By tagging or replying to the bot as if talking to an assistant*, a user can
-- get notified whenever there's a new spending coming in via email
-- add/modify/delete any spending transaction with the proper amount, date and any description relevant to the family
+The only database is a **Google Spreadsheet**.
+
+**By tagging or replying to the bot as if talking to an assistant**, a user can
+- get notified via Telegram whenever there's a new spending coming in via bank email
+- add/modify/delete any spending transaction with the amount, date and any description relevant to the family
 - request the general spending status of the family
 - request the detailed spending status for a group such as *fix expense, variable expense, saving, family fund, target fund*, etc.
 - get the weekly spending report
 - get monthly budget suggestion and adjust the budget for the next month
+
+### Data privacy
+- At anytimes, the user can turn off the bot and continue using the spreadsheet manually
+- The bot does not store any user data, except for the last update id read from Telegram to avoid reading the same message twice
+- The bot does not store any chat data, except for the last message sent to the user to avoid sending the same message twice
+- The bot does not store any transaction data, except for the transaction data in the Google Spreadsheet
 
 ### Scheduled functions
 - Read the mailbox every hour to add new transactions
@@ -36,7 +44,7 @@ The Telegram bot enables a household to manage their budget semi-automatically t
 - Send the answer to a dedicated group chat (or channel) set in the configuration
 
 ### promptHandler
-- Build both user and system prompts before calling the llm
+- Build both user and system prompts before calling the LLM
 - Prompts are used for: transaction classification, intent detection, spending analytics (with sub-intent), budget analytics, monthly budget setup, enrich the context and instruction database
 
 ### llmHandler
