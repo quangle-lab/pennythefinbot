@@ -99,30 +99,9 @@ function isValidTransaction(aiResult, subject, body, message = null) {
     if (subjectLower.includes(keyword.toLowerCase())) {
       return false;
     }
-  }
+  }  
 
-  // 4. Kiểm tra body có chứa nội dung giao dịch thực sự
-  const transactionKeywords = [
-    'giao dịch', 'transaction', 'thanh toán', 'payment', 'chuyển khoản', 'transfer',
-    'rút tiền', 'withdrawal', 'nạp tiền', 'deposit', 'số dư', 'balance',
-    'thẻ', 'card', 'atm', 'pos', 'internet banking', 'mobile banking'
-  ];
-
-  const bodyLower = body.toLowerCase();
-  let hasTransactionKeyword = false;
-  for (const keyword of transactionKeywords) {
-    if (bodyLower.includes(keyword.toLowerCase())) {
-      hasTransactionKeyword = true;
-      break;
-    }
-  }
-
-  // Nếu không có từ khóa giao dịch nào thì có thể không phải email giao dịch
-  if (!hasTransactionKeyword) {
-    return false;
-  }
-
-  // 5. Kiểm tra định dạng số tiền có hợp lệ không
+  // 4. Kiểm tra định dạng số tiền có hợp lệ không
   if (aiResult.amount) {
     const amountStr = aiResult.amount.toString().replace(/[€\s,]/g, '');
     const amountNum = parseFloat(amountStr);
@@ -138,7 +117,7 @@ function isValidTransaction(aiResult, subject, body, message = null) {
     }
   }
 
-  // 6. Kiểm tra ngày có hợp lệ không
+  // 5. Kiểm tra ngày có hợp lệ không
   if (aiResult.date) {
     try {
       const dateParts = aiResult.date.split('/');
@@ -154,42 +133,6 @@ function isValidTransaction(aiResult, subject, body, message = null) {
       }
     } catch (e) {
       // Nếu không parse được ngày thì có thể không hợp lệ
-      return false;
-    }
-  }
-
-  // 7. Kiểm tra sender có phải từ ngân hàng không (optional)
-  let sender = '';
-  if (message && typeof message.getFrom === 'function') {
-    try {
-      sender = message.getFrom().toLowerCase();
-    } catch (e) {
-      sender = '';
-    }
-  }
-
-  const bankDomains = [
-    'techcombank', 'vietcombank', 'bidv', 'agribank', 'mbbank', 'acb',
-    'sacombank', 'eximbank', 'hdbank', 'tpbank', 'vpbank', 'shb',
-    'credit-agricole', 'bnpparibas', 'societegenerale', 'lcl'
-  ];
-
-  // Nếu có thông tin sender và không phải từ ngân hàng thì cần cẩn thận hơn
-  if (sender) {
-    let isFromBank = false;
-    for (const domain of bankDomains) {
-      if (sender.includes(domain)) {
-        isFromBank = true;
-        break;
-      }
-    }
-
-    // Nếu không phải từ ngân hàng và có nhiều dấu hiệu spam thì bỏ qua
-    if (!isFromBank && (
-      invalidValues.includes(aiResult.category) ||
-      invalidValues.includes(aiResult.desc) ||
-      aiResult.desc === 'Thông báo lỗi script Penny'
-    )) {
       return false;
     }
   }
