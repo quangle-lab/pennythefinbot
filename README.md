@@ -30,7 +30,7 @@ By tagging or replying to the bot as if talking to an assistant, a user can
 ## botHandler
 - Read Telegram message and call for intent detection
 - Send the answer to a dedicated group chat (or channel) set in the configuration
-- DEBUG MODE: on to send replies to the main channel, off to the debug channel
+- DEBUG MODE: `off` to send replies to the main channel, `off` to the debug channel (c.f. project Settings)
 
 ## promptHandler
 - Build both user and system prompts before calling the llm
