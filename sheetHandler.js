@@ -168,7 +168,7 @@ function getTxCat() {
   const catTxSheet = SpreadsheetApp.openById(SPREADSHEET_ID);
 
   const promptParts = [];
-  promptParts.push("Các giao dịch tài chính được phân vào các nhóm:");
+  promptParts.push("Các giao dịch tài chính được phân vào các nhóm/mục như sau:");
 
   namedRanges.forEach((rangeName, index) => {
     const namedRange = catTxSheet.getRangeByName(rangeName);
@@ -511,7 +511,3 @@ function getFundBalances (type) {
 //TODO
 }
 
-//lấy dữ liệu có/nợ của quỹ của tháng monthText theo type -- gia đình (rainy), mục đích (target) hoặc tiết kiệm (saving)
-function getFundTx (monthText, type) {
-//TODO
-}

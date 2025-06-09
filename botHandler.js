@@ -164,12 +164,6 @@ function checkTelegramMessages() {
             break;
           }
 
-          case "getExCatTx": {
-            const result = getExCatTx(intentObj.group, intentObj.category, intentObj.monthText);
-            confirmationLines.push(intentObj.confirmation || `💰 Giao dịch: ${result}`);
-            break;
-          }
-
           case "createBudget": {
             const { sourceMonth, month } = intentObj;
             const confirmation = createNewBudget(month, sourceMonth);
