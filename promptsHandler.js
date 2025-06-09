@@ -37,7 +37,8 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         - getBudget: yêu cầu thông tin dự toán của tháng
         - modifyBudget: cập nhật dự toán dự trên thông tin bạn đề nghị
         - getFundBalance: lấy số dư các quỹ.
-        - getSavingBalance: lấy số dư tiết kiệm.        
+        - getSavingBalance: lấy số dư tiết kiệm.
+        - affordTest: kiểm tra khả năng chi trả cho một khoản chi tiêu dựa trên tình hình tài chính hiện tại
         - others: các intent khác, kèm theo ghi chú trong mục note
   
   Trong một tin nhắn của khách hàng có thể có nhiều intents, 
@@ -96,12 +97,23 @@ function generateIntentDetectionPrompt (originalText, replyText) {
             "ghi chú":"ghi chú của khách hàng về mục dự toán này cho tháng"
           }
         ]
-      } 
-    - Nếu không xác định được ý định, thử tìm hiểu ý định của khách hàng là gì và đáp ứng. Ngoài ra, chỉ rõ hiện tại bạn chỉ hỗ trợ 
-        - ghi chép giao dịch, 
-        - lấy báo cáo tài chính, 
-        - tạo và chỉnh sửa dự toán cho tháng, 
-        - chỉnh sửa giao dịchh. 
+      }
+    - Yêu cầu kiểm tra khả năng chi trả
+      {
+        "intent":"affordTest",
+        "item":"tên món đồ hoặc khoản chi tiêu khách hàng muốn mua/chi trả",
+        "amount":"số tiền dự kiến chi theo định dạng €20.00",
+        "category":"mục phân loại dự kiến cho khoản chi này theo danh sách categories",
+        "group":"nhóm phân loại dự kiến cho khoản chi này",
+        "timeframe":"thời gian dự kiến chi trả (ngay lập tức, tháng này, tháng tới, quý này, năm này, etc.)",
+        "confirmation":"tin nhắn xác nhận đã thực hiện phân tích khả năng chi trả"
+      }
+    - Nếu không xác định được ý định, thử tìm hiểu ý định của khách hàng là gì và đáp ứng. Ngoài ra, chỉ rõ hiện tại bạn chỉ hỗ trợ
+        - ghi chép giao dịch,
+        - lấy báo cáo tài chính,
+        - tạo và chỉnh sửa dự toán cho tháng,
+        - chỉnh sửa giao dịch,
+        - kiểm tra khả năng chi trả cho các khoản chi tiêu.
       Thử đề nghị 1 yêu cầu phù hợp trong danh sách và rả lại JSON theo cấu trúc sau, không có dấu code block 
       {"intent":"others", 
         "reply":"câu trả lời của bạn cho khách hàng",
@@ -219,7 +231,7 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
 
         Yêu cầu
         - Giới hạn trong 200 ký tự
-        - Ngôn ngữ sử dụng: Tiếng Việt
+        - Ngôn ngữ: mặc định tiếng Việt. Nếu khách hàng hỏi bằng ngôn ngữ khác (e.g. what is the breakdown for fix expense this month?), hãy trả lời bằng cùng ngôn ngữ với khách hàng.
         - Dùng đúng tên mục trong báo cáo tài chính
         - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng  
         - Dùng định dạng markdown cho Telegram, không có dấu code block
@@ -295,7 +307,7 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
         
     Yêu cầu trình bày
       - Giới hạn trong 250 ký tự
-      - Ngôn ngữ sử dụng: Tiếng việt
+      - Ngôn ngữ: mặc định tiếng Việt. Nếu khách hàng hỏi bằng ngôn ngữ khác (e.g. what is the breakdown for fix expense this month?), hãy trả lời bằng cùng ngôn ngữ với khách hàng.
       - Dùng đúng tên mục trong báo cáo tài chính
       - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng 
       - Dùng dấu ✅ để ghi nhận chênh lệch tốt và ⚠️ để ghi nhận chênh lệch xấu
@@ -395,5 +407,101 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
         - Bạn phân loại các giao dịch của khách hàng và ghi chú những tiêu chí cần thiết để luôn luôn cải thiện việc phân loại giao dịch.
         - Bạn chỉ có quyền phân loại sai 1 lần. Bạn phải ghi chép cụ thể hướng dẫn để đảm bảo lỗi phân loại sai không diễn ra lần nữa mà không cần khách hàng xác nhận.`,
     userMessage: mainPrompt
+  };
+}
+
+//prompt phân tích khả năng chi trả
+function generateAffordabilityAnalysisPrompt(item, amount, category, group, timeframe) {
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  const currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
+  const nextMonth = Utilities.formatDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1), Session.getScriptTimeZone(), "MM/yyyy");
+
+  // Get family context and budget instructions
+  const familyContext = getFamilyContext();
+  const budgetInstructions = getBudgetInstructions();
+
+  // Get current month expense data
+  const currentMonthData = getDashboardData(currentMonth);
+
+  // Get next month budget data
+  const nextMonthBudget = getBudgetData(nextMonth);
+
+  // Get fund balances
+  const fundBalances = getFundBalances("all");
+  const formattedFundBalances = formatFundBalances(fundBalances);
+
+  let affordabilityPrompt = `
+  🏠 **Hoàn cảnh gia đình:**
+  ${familyContext}
+
+  💶 **Hướng dẫn dự toán:**
+  ${budgetInstructions}
+
+  📊 **Tình hình tài chính tháng hiện tại (${currentMonth}):**
+  ${currentMonthData}
+
+  📋 **Dự toán tháng tới (${nextMonth}):**
+  ${nextMonthBudget}
+
+  💰 **Số dư các quỹ hiện tại:**
+  ${formattedFundBalances}
+
+  🛒 **Khoản chi tiêu cần phân tích:**
+  - Món đồ/Chi phí: ${item}
+  - Số tiền: ${amount}
+  - Phân loại dự kiến: ${category} (${group})
+  - Thời gian dự kiến: ${timeframe}
+
+  📝 **Yêu cầu phân tích:**
+  Dựa trên tất cả thông tin tài chính trên, hãy phân tích khả năng chi trả cho khoản chi tiêu này và đưa ra lời khuyên cụ thể.
+
+  **Cấu trúc phản hồi:**
+
+  🔍 **Phân tích khả năng chi trả cho "${item}" - ${amount}**
+  _Ngày phân tích: ${currentTime}_
+
+  **💡 Kết luận:** [CÓ THỂ CHI TRẢ / CẦN CÂN NHẮC / KHÔNG NÊN CHI TRẢ]
+
+  **📊 Phân tích chi tiết:**
+
+  1. **Tình hình ngân sách hiện tại:**
+     - Phân tích mức độ sử dụng ngân sách tháng hiện tại
+     - Đánh giá khả năng dư thừa trong nhóm chi phí tương ứng
+     - So sánh với dự toán tháng tới
+
+  2. **Tác động đến quỹ:**
+     - Đánh giá tác động đến số dư các quỹ
+     - Khuyến nghị quỹ nào nên sử dụng (nếu có)
+     - Tác động đến mục tiêu tài chính dài hạn
+
+  3. **Phương án thực hiện:**
+     - Thời điểm tối ưu để chi trả
+     - Cách thức chi trả (từ quỹ nào, hay điều chỉnh ngân sách)
+     - Các biện pháp bù đắp (nếu cần)
+
+  **⚠️ Lưu ý và khuyến nghị:**
+  - Đưa ra lời khuyên cụ thể dựa trên hoàn cảnh gia đình
+  - Đề xuất các phương án thay thế (nếu có)
+  - Cảnh báo về rủi ro tài chính (nếu có)
+
+  **🎯 Kế hoạch hành động:**
+  - Các bước cụ thể khách hàng nên thực hiện
+  - Điều chỉnh ngân sách cần thiết
+  - Theo dõi và đánh giá sau khi chi trả
+
+  **Yêu cầu trình bày:**
+  - Ngôn ngữ: Tiếng Việt, thân thiện và dễ hiểu
+  - Sử dụng emoji phù hợp để làm nổi bật
+  - Đưa ra con số cụ thể và tính toán rõ ràng
+  - Dùng định dạng markdown cho Telegram
+  - Giới hạn trong 300 từ, tập trung vào những điểm quan trọng nhất
+  `;
+
+  return {
+    systemMessage: `Bạn là một chuyên gia tài chính cá nhân với kinh nghiệm phân tích khả năng chi trả.
+    Nhiệm vụ của bạn là đưa ra lời khuyên chính xác, thực tế và có trách nhiệm về việc có nên chi tiêu hay không.
+    Luôn ưu tiên sự ổn định tài chính lâu dài của khách hàng.
+    Mốc thời gian hiện tại là ${currentTime}.`,
+    userMessage: affordabilityPrompt
   };
 }

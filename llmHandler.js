@@ -156,3 +156,43 @@ function detectNewContextWithOpenAI(originalTx, originalText, replyText) {
     return { intent: "unknown" };
   }
 }
+
+//xác định khả năng thực hiện mục tiêu
+function checkAffordabilityWithOpenAI(item, amount, category, group, timeframe) {
+  const apiKey = OPENAI_TOKEN;
+
+  // Sử dụng prompt builder từ promptsHandler
+  const promptData = generateAffordabilityAnalysisPrompt(item, amount, category, group, timeframe);
+
+  const payload = {
+    model: "gpt-4.1",
+    input: [
+      {
+        role: "system",
+        content: promptData.systemMessage
+      },
+      {
+        role: "user",
+        content: promptData.userMessage
+      }
+    ],
+    temperature: 0.7
+  };
+
+  const options = {
+    method: "POST",
+    contentType: "application/json",
+    headers: {
+      Authorization: `Bearer ${apiKey}`
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
+  const json = JSON.parse(response.getContentText());
+  const content = json.output[0].content[0].text;
+  Logger.log (content);
+
+  return content;
+}

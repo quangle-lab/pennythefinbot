@@ -159,8 +159,19 @@ function checkTelegramMessages() {
           }
 
           case "getFundBalance": {
-            const result = getFundBalances(); // optional: add month input
-            confirmationLines.push(intentObj.confirmation || `🏦 Số dư các quỹ:\n${result}`);
+            const result = getFundBalances("all");
+            const formattedResult = formatFundBalances(result);
+            confirmationLines.push(intentObj.confirmation || formattedResult);
+            break;
+          }
+
+          case "affordTest": {
+            const { item, amount, category, group, timeframe } = intentObj;
+
+            //gọi hàm check khả năng mua
+            let affordabilityCheck = checkAffordabilityWithOpenAI(item, amount, category, group, timeframe);       
+            confirmationLines.push(affordabilityCheck);   
+            
             break;
           }
 
@@ -272,7 +283,7 @@ function sendWeeklyReport () {
   sendTelegramMessage (message);
 }
 
-//tạo dự toán tháng mới và gửi thông báo vào ngày 27 hàng tháng
+//tạo dự toán tháng mới và gửi thông báo hàng tháng
 function initMonthlyBudget () {
   const monthFormat = "MM/yyyy";
 
