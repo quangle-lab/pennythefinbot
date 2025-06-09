@@ -1,53 +1,5 @@
 //tạo các prompts
 
-//prompt hướng dẫn phân loại giao dịch
-function generateTxCatPrompt() {
-  const namedRanges = [
-    "ThuNhap",
-    "ChiPhiCoDinh",
-    "ChiPhiBienDoi",
-    "QuyGiaDinh",
-    "QuyMucDich",
-    "TietKiem"
-  ];
-
-  const catTxSheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-
-  const promptParts = [];
-  promptParts.push("Các giao dịch tài chính được phân vào các tab:");
-
-  namedRanges.forEach((rangeName, index) => {
-    const namedRange = catTxSheet.getRangeByName(rangeName);
-    if (!namedRange) return;
-
-    const sheet = namedRange.getSheet();
-    const startRow = namedRange.getRow();    
-    const numRows = namedRange.getNumRows();
-
-    // Mở rộng từ cột A đến C => width = 3
-    const fullRange = sheet.getRange(startRow, 1, numRows, 3);
-    const values = fullRange.getValues();
-
-    // Lấy tên nhóm từ cột A (duy nhất trong đoạn này)
-    const uniqueGroupNames = [...new Set(values.map(row => row[0]).filter(name => !!name))];
-    const groupName = uniqueGroupNames[0] || rangeName;
-
-    const items = [];
-    values.forEach(([, muc, mieuta]) => {
-      if (muc && mieuta) {
-        items.push(`  ${muc}: ${mieuta}`);
-      }
-    });
-
-    if (items.length > 0) {
-      promptParts.push(`\n${index + 1}/ ${groupName}:\n${items.join('\n')}`);
-    }
-  });
-  
-  const instructionCatPrompt = promptParts.join("\n");
-  return instructionCatPrompt;
-}
-
 //prompt phân tích ý định người sử dụng
 function generateIntentDetectionPrompt (originalText, replyText) {
   if (originalText) {
