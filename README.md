@@ -19,7 +19,7 @@ The Telegram bot enables a household to manage their budget semi-automatically t
 The only database is a **Google Spreadsheet**.
 
 **By tagging or replying to the bot as if talking to an assistant**, a user can
-- get notified via Telegram whenever there's a mail notification from the bank
+- get a short summary of the transaction via Telegram whenever there's a mail notification from the bank
 - modify/delete any spending transaction with the amount, date and any description relevant to the family
 - add new transactions manually
 - request the general spending status of the family
@@ -34,8 +34,8 @@ The only database is a **Google Spreadsheet**.
 - The bot does not store any chat data, all the conversation is happening in the Telegram group
 - The bot does not store any transaction data, all the transactions are stored in the Google Spreadsheet and fetch on the fly to answer the user queries
 
-### Scheduled functions
-- Read the mailbox every hour to add new transactions
+### Scheduled jobs
+- Read the mailbox every hour to add new transactions and notify the user through Telegram
 - Read the group chat every minute to answer user queries
 - Send weekly spending report every Monday
 - Initiate the monthly budget every 27th of the month
