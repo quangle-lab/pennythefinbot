@@ -16,16 +16,19 @@
 ## Features
 ### Description
 The Telegram bot enables a household to manage their budget semi-automatically through email synchronisation and manual input. 
-By tagging or replying to the bot as if talking to an assistant, a user can
-- sync up with a GMail inbox to read and add transaction based on the bank mail notifications
-- add/modify/delete any spending transaction to change the amount, date or any description relevant to the family
-- get the general monthly financial status of the family
-- get the detailed monthly financial status for a group such as *fix expense, variable expense, saving, family fund, target fund*, etc.
-- set up and adjust the budget for a new month based on an existing month
+*By tagging or replying to the bot as if talking to an assistant*, a user can
+- get notified whenever there's a new spending coming in via email
+- add/modify/delete any spending transaction with the proper amount, date and any description relevant to the family
+- request the general spending status of the family
+- request the detailed spending status for a group such as *fix expense, variable expense, saving, family fund, target fund*, etc.
+- get the weekly spending report
+- get monthly budget suggestion and adjust the budget for the next month
 
 ### Scheduled functions
 - Read the mailbox every hour to add new transactions
 - Read the group chat every minute to answer user queries
+- Send weekly spending report every Monday
+- Initiate the monthly budget every 27th of the month
 
 ## Codebase
 ### botHandler
