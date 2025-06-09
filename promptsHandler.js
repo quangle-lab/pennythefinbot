@@ -164,7 +164,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
 }
 
 //prompt phân tích chi tiêu, dataSource có thể là: dashboard, fixEx, varEx
-function generateExpenseAnalyticsPrompt(monthText, dataSource) {
+function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
   var expenseAnalyticsPrompt = ""; 
 
   //tạo prompt hoàn cảnh và phân loại
@@ -180,13 +180,43 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
       expenseAnalyticsPrompt = `        
         Hoàn cảnh gia đình:\n${familyContext}.
         \nHướng dẫn phân loại:\n${catInstructions}.
-        \nBáo cáo tài chính tháng:\n
+        \nBáo cáo tài chính tháng có cấu trúc như sau:\n        
         - Mỗi nhóm bao gồm các mục, ngăn với nhau bằng dấu |, chứa các thông tin lần lượt là Mục, Dự đoán, Thực Tế, Chênh lệch.
         - Cuối mỗi nhóm, dòng TỔNG chứa tổng dự đoán, tổng thực tế và tổng chênh lệch 
-
         ${monthDashboardData}                
 
-        Dựa trên các thông tin trên, hãy trả về nội dung theo cấu trúc sau
+        Đây là yêu cầu của khách hàng theo ngôn ngữ tự nhiên: ${userText}\n
+        Dựa trên câu hỏi đó, bạn phải xác định rõ yêu cầu là dạng nào chỉ 1 trong 2 dạn: Tổng quát hay Chi tiết theo nhóm
+
+        ### Phân loại yêu cầu:
+
+        1. **Tổng quát** — khi câu hỏi:
+          - Không nói rõ nhóm cụ thể
+          - Hoặc hỏi chung về "chi tiêu", "tình hình chi tiêu", "tháng này thế nào"
+          - Hoặc chỉ hỏi "có vượt không", "vượt bao nhiêu", "chi tiêu ra sao"
+
+        2. **Chi tiết theo nhóm** — khi câu hỏi:
+          - Nêu rõ tên nhóm (ví dụ: "chi tiết chi phí biến đổi", "mục tiết kiệm")
+          - Hoặc có các từ khóa: "chi tiết", "breakdown", "từng mục", "mục nào", "nhóm nào", "thành phần", "gồm những gì"
+
+        ---
+
+        ### Ví dụ phân loại:
+
+        | Câu hỏi của khách | Phân loại |  
+        |-------------------|-----------|  
+        | "Chi tiêu tháng này thế nào?" | Tổng quát  
+        | "Mình vượt bao nhiêu so với kế hoạch?" | Tổng quát  
+        | "Chi tiết mục chi phí biến đổi tháng này giúp mình" | Chi tiết theo nhóm  
+        | "Mình chi tiêu mục nào nhiều nhất trong nhóm chi phí cố định?" | Chi tiết theo nhóm  
+        | "Cho mình xem breakdown tiết kiệm" | Chi tiết theo nhóm  
+        | "Mục tiêu chi tiêu tháng này đạt không?" | Tổng quát  
+
+        ---
+
+        ### Hướng dẫn phản hồi:
+
+        **Nếu là yêu cầu Tổng quát**, trả lời theo cấu trúc:
         =====
         *Báo cáo chi tiêu tháng ${monthText}*        
         _Tính đến ngày ${currentDate}_
@@ -212,6 +242,28 @@ function generateExpenseAnalyticsPrompt(monthText, dataSource) {
           Cho mỗi nhóm, nêu các mục vượt dự chi và số tiền vượt. Nêu bật bằng emoji ⚠️(vượt mức dưới 5%) hoặc ‼️(nghiêm trọng -- vượt rất xa dự tính)
         =====
         *🎯Mục tiêu*: phân tích tình hình chi tiêu hiện tại và khả năng hoàn thành mục tiêu
+
+        **Nếu là yêu cầu Chi tiết theo nhóm**, trả lời theo cấu trúc:
+        =====
+        *Báo cáo chi tiêu tháng ${monthText}*
+        _Tính đến ngày ${currentDate}_
+
+        *🫣Tình hình chi tiêu*
+        ======
+          *Tên nhóm*
+          - Tên mục 
+            - dự chi
+            - thực chi
+            - chênh lệch
+          - Tên mục 
+            - dự chi
+            - thực chi
+            - chênh lệch          
+          ...
+        Nếu nhóm có mục vượt dự chi, nêu bật bằng emoji ⚠️(vượt mức dưới 5%) hoặc ‼️(nghiêm trọng -- vượt rất xa dự tính)
+        =====
+        *🎯Mục tiêu*: phân tích tình hình chi tiêu hiện tại và khả năng hoàn thành mục tiêu
+
 
         Yêu cầu
         - Giới hạn trong 200 ký tự
