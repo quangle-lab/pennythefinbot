@@ -15,26 +15,19 @@ function generateIntentDetectionPrompt (originalText, replyText) {
 
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
   
-  let intentDetectionPrompt = `
-  ${familyContext}
-  \n${budgetInstructions}
-  \n${categoriseInstructions}
-  \n${categories}
-  \n${userText}  
-
+  let intentDetectionPrompt = `  
   Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
   Nhiệm vụ của bạn là 
   - phân loại các giao dịch, thay đổi theo yêu cầu khách hàng và cải thiện chế độ phân loại
   - đề xuất dự toán hàng tháng, thay đổi số tiền trong dự toán theo yêu cầu của khách hàng
   Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
   
-  Dựa vào nội dung trao đổi trên, kèm thông tin dự toán của tháng hiện tại, hãy xác định xem ý định (intent) của khách hàng dựa trên danh sách sau
+  Dựa vào nội dung trao đổi sau ${userText}, kèm thông tin dự toán của tháng hiện tại, hãy xác định xem ý định (intent) của khách hàng dựa trên danh sách sau
         - addTx: thêm thủ công 1 giao dịch mới
         - modifyTx: cập nhật dòng giao dịch
         - deleteTx: xóa dòng giao dịch           
         - getMonthlyReport: yêu cầu báo cáo tài chính tháng
-        - addNewBudget: tạo dự toán cho tháng mới hoặc dự án mới
-        - getBudget: yêu cầu thông tin dự toán của tháng
+        - addNewBudget: tạo dự toán cho tháng mới hoặc dự án mới        
         - modifyBudget: cập nhật dự toán dự trên thông tin bạn đề nghị
         - getFundBalance: lấy số dư các quỹ.
         - getSavingBalance: lấy số dư tiết kiệm.
@@ -108,7 +101,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "timeframe":"thời gian dự kiến chi trả (ngay lập tức, tháng này, tháng tới, quý này, năm này, etc.)",
         "confirmation":"tin nhắn xác nhận đã thực hiện phân tích khả năng chi trả"
       }
-    - Nếu không xác định được ý định, thử tìm hiểu ý định của khách hàng là gì và đáp ứng. Ngoài ra, chỉ rõ hiện tại bạn chỉ hỗ trợ
+    - Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn chỉ hỗ trợ
         - ghi chép giao dịch,
         - lấy báo cáo tài chính,
         - tạo và chỉnh sửa dự toán cho tháng,
@@ -118,12 +111,26 @@ function generateIntentDetectionPrompt (originalText, replyText) {
       {"intent":"others", 
         "reply":"câu trả lời của bạn cho khách hàng",
         "note:"ghi chú của bạn về ý định của khách hàng để có thể hỗ trợ tốt hơn lần sau"
-      }.  
+      }.
+      
+      ${familyContext}
+      \n${budgetInstructions}
+      \n${categoriseInstructions}
+      \n${categories}
     `
   return {
-    systemMessage: `Bạn là một cố vấn tài chính cá nhân phiên bản 0.6 đang trao đổi với khách hàng qua Telegram và Email. 
-    Nếu không rõ hoặc thiếu thông tin giao dịch, hãy trao đổi với khách hàng để làm rõ thêm, tránh hiểu nhầm ý định của khách hàng.
-    Mốc thời gian hiện tại là tháng ${currentTime}.`, 
+   systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+      Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.  
+      
+      ## PLANNING
+      You MUST plan extensively before each function call, and reflect 
+      extensively on the outcomes of the previous function calls. DO NOT do this 
+      entire process by making function calls only, as this can impair your 
+      ability to solve the problem and think insightfully.`, 
     userMessage: intentDetectionPrompt};
 }
 
@@ -141,16 +148,9 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
   switch (dataSource) {
     case "dashboard": {
       monthDashboardData = getDashboardData (monthText);
-      expenseAnalyticsPrompt = `        
-        Hoàn cảnh gia đình:\n${familyContext}.
-        \nHướng dẫn phân loại:\n${catInstructions}.
-        \nBáo cáo tài chính tháng có cấu trúc như sau:\n        
-        - Mỗi nhóm bao gồm các mục, ngăn với nhau bằng dấu |, chứa các thông tin lần lượt là Mục, Dự đoán, Thực Tế, Chênh lệch.
-        - Cuối mỗi nhóm, dòng TỔNG chứa tổng dự đoán, tổng thực tế và tổng chênh lệch 
-        ${monthDashboardData}                
-
+      expenseAnalyticsPrompt = `
         Đây là yêu cầu của khách hàng theo ngôn ngữ tự nhiên: ${userText}\n
-        Dựa trên câu hỏi đó, bạn phải xác định rõ yêu cầu là dạng nào chỉ 1 trong 2 dạn: Tổng quát hay Chi tiết theo nhóm
+        Dựa trên câu hỏi đó, hoàn cảnh và các dữ liệu trong báo cáo tài chính tháng ${monthText}, bạn phải xác định rõ yêu cầu là dạng nào chỉ 1 trong 2 dạng: Tổng quát hay Chi tiết theo nhóm
 
         ### Phân loại yêu cầu:
 
@@ -238,8 +238,16 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
             *bold text*
             _italic text_
             [inline URL](http://www.example.com/)
-            [inline mention of a user](tg://user?id=123456789)
-        `;  
+            [inline mention of a user](tg://user?id=123456789)               
+
+        ${familyContext}.
+        ${catInstructions}.
+        \nBáo cáo tài chính tháng có cấu trúc như sau:\n        
+        - Mỗi nhóm bao gồm các mục, ngăn với nhau bằng dấu |, chứa các thông tin lần lượt là Mục, Dự đoán, Thực Tế, Chênh lệch.
+        - Cuối mỗi nhóm, dòng TỔNG chứa tổng dự đoán, tổng thực tế và tổng chênh lệch 
+        
+        ${monthDashboardData}`                
+    ;  
       break;
     }
 
@@ -256,9 +264,19 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
     }
   }
   return {         
-    systemMessage: `Bạn là một chuyên gia tài chính cá nhân đang trao đổi với khách hàng qua Telegram. 
-      Mốc thời gian hiện tại là tháng ${currentTime}
-      Hãy dựa vào mục tiêu của khách hàng, phân tích thẳng thắng, rõ ràng để giúp khách hoàn thành mục tiêu tài chính cá nhân của mình.`, 
+    systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+      Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.  
+      
+      ## PLANNING
+      You MUST plan extensively before each function call, and reflect 
+      extensively on the outcomes of the previous function calls. DO NOT do this 
+      entire process by making function calls only, as this can impair your 
+      ability to solve the problem and think insightfully.`, 
+
     userMessage: expenseAnalyticsPrompt };
 }
 
@@ -279,12 +297,28 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
   const dashboardData = getDashboardData (thisMonthText);
   
   budgetAnalyticsPrompt = `
-    \nHoàn cảnh gia đình như sau:\n${familyContext}
-    \nChỉ dẫn dự toán:\n${budgetInstructions}
-    \n${dashboardData}    
-    \n${budgetData}
-            
-    Dựa trên các thông tin về chi tiêu, hướng dẫn dự toán, hãy trả về nội dung theo cấu trúc sau
+    # Identity
+    Bạn là chuyên gia cố vấn có kinh nghiệ và coach tài chính cá nhân. 
+  
+    # Instructions
+    Dựa trên các thông tin về chi tiêu, hướng dẫn dự toán, hãy tiến hành các bước sau
+    - Bước 1: đối chiếu dự toán tháng ${nextMonthText} với chi tiêu tháng ${thisMonthText} từ phần Dữ liệu
+    - Bước 2: tra cứu các chỉ dẫn dự toán xem tháng sau có phát sinh giao dịch gì không
+    - Bước 3: dựa trên các thông tin trên, đề xuất các thay đổi cho dự toán tháng ${nextMonthText}  
+    - Bước 4: trả lời cho khách hàng theo cấu trúc sau và tuần thủ yêu cầu trình bày
+      - Giới hạn trong 250 ký tự
+      - Ngôn ngữ: mặc định tiếng Việt. Nếu khách hàng hỏi bằng ngôn ngữ khác (e.g. what is the breakdown for fix expense this month?), hãy trả lời bằng cùng ngôn ngữ với khách hàng.
+      - Dùng đúng tên mục trong báo cáo tài chính
+      - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng 
+      - Dùng dấu ✅ để ghi nhận chênh lệch tốt và ⚠️ để ghi nhận chênh lệch xấu
+      - Cho phần dự toán, nó rõ là đề nghị để khách hàng cân nhắc và thêm call to action để khách hàng trả lời lại tin nhắn nếu cần thay đổi dự toán
+      - Dùng định dạng markdown cho Telegram, không có dấu code block
+            *bold text*
+            _italic text_
+            [inline URL](http://www.example.com/)
+            [inline mention of a user](tg://user?id=123456789)        
+
+    
       🧐 *Đối chiếu Dự toán ${nextMonthText} vs. Chi tiêu ${thisMonthText} *. 
 
       *🫣Tình hình chi tiêu tháng ${thisMonthText}*      
@@ -304,25 +338,27 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
         
       *💶Dự toán tháng ${nextMonthText}*      
        - <tên mục>:  <số tiền đề nghị>. Dựa trên mục tiêu tài chính trong hoàn cảnh, giải thích lí do của đề nghị tăng hay giảm so với mức dự toán cũ (ngoại trừ thu nhập).      
-        
-    Yêu cầu trình bày
-      - Giới hạn trong 250 ký tự
-      - Ngôn ngữ: mặc định tiếng Việt. Nếu khách hàng hỏi bằng ngôn ngữ khác (e.g. what is the breakdown for fix expense this month?), hãy trả lời bằng cùng ngôn ngữ với khách hàng.
-      - Dùng đúng tên mục trong báo cáo tài chính
-      - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng 
-      - Dùng dấu ✅ để ghi nhận chênh lệch tốt và ⚠️ để ghi nhận chênh lệch xấu
-      - Cho phần dự toán, nó rõ là đề nghị để khách hàng cân nhắc và thêm call to action để khách hàng trả lời lại tin nhắn nếu cần thay đổi dự toán
-      - Dùng định dạng markdown cho Telegram, không có dấu code block
-            *bold text*
-            _italic text_
-            [inline URL](http://www.example.com/)
-            [inline mention of a user](tg://user?id=123456789)  
+
+    # Dữ liệu
+    ${familyContext}.
+    ${budgetInstructions}.
+    ${budgetData}.
+    ${dashboardData}.              
   `;
 
   return {         
-    systemMessage: `Bạn là một chuyên gia tài chính cá nhân đang trao đổi với khách hàng qua Telegram. 
-      Mốc thời gian hiện tại là tháng ${currentTime}
-      Tuân thủ chặt chẽ các yêu cầu chỉ dẫn dự toán nhằm hạn chế phát sinh.`, 
+   systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+      Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.  
+      
+      ## PLANNING
+      You MUST plan extensively before each function call, and reflect 
+      extensively on the outcomes of the previous function calls. DO NOT do this 
+      entire process by making function calls only, as this can impair your 
+      ability to solve the problem and think insightfully.`, 
     userMessage: budgetAnalyticsPrompt };
 }
 
@@ -355,7 +391,17 @@ function generateClassifyTransactionPrompt(subject, body) {
   `;
 
   return {
-    systemMessage: `Bạn là một cố vấn tài chính cá nhân. Bạn đang đọc email thông báo giao dịch của ngân hàng để phân loại giúp khách hàng. Mốc thời gian hiện tại là  ${currentTime}`,
+    systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.      
+      
+      ## PLANNING
+      You MUST plan extensively before each function call, and reflect 
+      extensively on the outcomes of the previous function calls. DO NOT do this 
+      entire process by making function calls only, as this can impair your 
+      ability to solve the problem and think insightfully.`,
     userMessage: mainPrompt
   };
 }
@@ -403,9 +449,17 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
   `;
 
   return {
-    systemMessage: `Bạn là một chuyên gia tài chính cá nhân. Mốc thời gian hiện tại là ${currentTime}
-        - Bạn phân loại các giao dịch của khách hàng và ghi chú những tiêu chí cần thiết để luôn luôn cải thiện việc phân loại giao dịch.
-        - Bạn chỉ có quyền phân loại sai 1 lần. Bạn phải ghi chép cụ thể hướng dẫn để đảm bảo lỗi phân loại sai không diễn ra lần nữa mà không cần khách hàng xác nhận.`,
+    systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+      Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.  
+      You can only make mistake once. Carefully analyse the customer instruction and update your knowledge base to make sure you catetorise the transaction correctly.
+      
+      ## PLANNING
+      You MUST plan extensively before each function call, and reflect 
+      extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.`,    
     userMessage: mainPrompt
   };
 }
@@ -416,34 +470,55 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
   const currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
   const nextMonth = Utilities.formatDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1), Session.getScriptTimeZone(), "MM/yyyy");
 
-  // Get family context and budget instructions
+  // Hoàn canh gia đình và hướng dẫn dự toán
   const familyContext = getFamilyContext();
   const budgetInstructions = getBudgetInstructions();
 
-  // Get current month expense data
+  // Chi tiêu cho tháng này
   const currentMonthData = getDashboardData(currentMonth);
 
-  // Get next month budget data
+  //  Dự toán cho tháng sau
   const nextMonthBudget = getBudgetData(nextMonth);
 
-  // Get fund balances
+  // Số dư các quỹ
   const fundBalances = getFundBalances("all");
   const formattedFundBalances = formatFundBalances(fundBalances);
 
   let affordabilityPrompt = `
-  🏠 **Hoàn cảnh gia đình:**
+  # Identity
+    Bạn là chuyên gia cố vấn có kinh nghiệ và coach tài chính cá nhân. 
+  
+  # Instructions
+  ## Bước
+  Dựa vào các thông tin dưới đây hãy tiến hành kiểm tra khả năng chi trả cho khoản chi tiêu mới.
+  - Bước 1: kiểm tra chi tiêu tháng hiện tại
+  - Bước 2: kiểm tra dự toán cho tháng tới
+  - Bước 3: kiểm tra số dư các quỹ
+  - Bước 4: đưa ra kết luận và lời khuyên cụ thể theo đúng Cấu trúc phản hồi
+  ## Yêu cầu trình bày
+  - Ngôn ngữ: Tiếng Việt, thân thiện và dễ hiểu
+  - Sử dụng emoji phù hợp để làm nổi bật
+  - Đưa ra con số cụ thể và tính toán rõ ràng
+  - Dùng định dạng markdown cho Telegram
+  - Giới hạn trong 250 từ, tập trung vào những điểm quan trọng nhất
+  - Dùng định dạng markdown cho Telegram, không có dấu code block
+            *bold text*
+            _italic text_
+            [inline URL](http://www.example.com/)
+            [inline mention of a user](tg://user?id=123456789)
+
+  # Dữ liệu
   ${familyContext}
 
-  💶 **Hướng dẫn dự toán:**
   ${budgetInstructions}
 
-  📊 **Tình hình tài chính tháng hiện tại (${currentMonth}):**
+  ##📊Tình hình tài chính tháng hiện tại (${currentMonth})
   ${currentMonthData}
 
-  📋 **Dự toán tháng tới (${nextMonth}):**
+  ##📋Dự toán tháng tới (${nextMonth})
   ${nextMonthBudget}
 
-  💰 **Số dư các quỹ hiện tại:**
+  ##💰Số dư các quỹ hiện tại
   ${formattedFundBalances}
 
   🛒 **Khoản chi tiêu cần phân tích:**
@@ -488,18 +563,6 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
   - Các bước cụ thể khách hàng nên thực hiện
   - Điều chỉnh ngân sách cần thiết
   - Theo dõi và đánh giá sau khi chi trả
-
-  **Yêu cầu trình bày:**
-  - Ngôn ngữ: Tiếng Việt, thân thiện và dễ hiểu
-  - Sử dụng emoji phù hợp để làm nổi bật
-  - Đưa ra con số cụ thể và tính toán rõ ràng
-  - Dùng định dạng markdown cho Telegram
-  - Giới hạn trong 250 từ, tập trung vào những điểm quan trọng nhất
-  - Dùng định dạng markdown cho Telegram, không có dấu code block
-            *bold text*
-            _italic text_
-            [inline URL](http://www.example.com/)
-            [inline mention of a user](tg://user?id=123456789)
   `;
 
   return {
