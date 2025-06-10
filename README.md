@@ -1,62 +1,68 @@
-# Penny - The Financial Bot
-## Prerequisites
-- Google Spreadsheet with the correct structure (c.f. template)
-- Telegram bot with the privacy turned off to read the group messages freely
-- OpenAI account with the API key
+# 🤖 Penny — Telegram Finance Assistant Bot
 
-## AppsScripts project settings
-- debug_Mode: `off` to send replies to the main channel, `on` to the debug channel
-- sheet_ContextConfig: the sheet name where the context and instruction are stored for prompts building
-- sheet_txCatConfig: the sheet name where the transaction categories are stored
-- telegram_DebugChat: the chat id where the debug messages are sent
-- telegram_logsChat: the chat id where the log messages are sent
-- telegram_lastUpdateId: the last update id read from Telegram, to avoid reading the same message twice
+**Penny** is a Telegram bot that helps families manage their household finances through a semi-automated system integrated with Google Sheets. It works via email notifications and manual input, using an LLM for smart classification and analysis.
 
+---
 
-## Features
-### Description
-The Telegram bot enables a household to manage their budget semi-automatically through email synchronisation and manual input. 
-The only database is a **Google Spreadsheet**.
+## 🧰 Prerequisites
 
-**By tagging or replying to the bot as if talking to an assistant**, a user can
-- get a short summary of the transaction via Telegram whenever there's a mail notification from the bank
-- modify/delete any spending transaction with the amount, date and any description relevant to the family
-- add new transactions manually
-- request the general spending status of the family
-- request the detailed spending status for a group such as *fix expense, variable expense, saving, family fund, target fund*, etc.
-- get the weekly spending report
-- get monthly budget suggestion and adjust the budget for the next month
-- check the affordability of a new purchase or a short-term goal
+To use the bot, you’ll need:
 
-### Data privacy
-- At anytimes, the user can turn off the bot and continue using the spreadsheet manually
-- The bot does not store any user data, except for the last update id read from Telegram to avoid reading the same message twice
-- The bot does not store any chat data, all the conversation is happening in the Telegram group
-- The bot does not store any transaction data, all the transactions are stored in the Google Spreadsheet and fetch on the fly to answer the user queries
+* ✅ A Google Spreadsheet with the proper structure ([see template](#))
+* ✅ A Telegram bot with **privacy mode turned off** to read group messages
+* ✅ An OpenAI API key
+* ✅ Apps Script project with the following configuration:
 
-### Scheduled jobs
-- Read the mailbox every hour to add new transactions and notify the user through Telegram
-- Read the group chat every minute to answer user queries
-- Send weekly spending report every Monday
-- Initiate the monthly budget every 27th of the month
+| Setting                 | Description                                                 |
+| ----------------------- | ----------------------------------------------------------- |
+| `debug_Mode`            | `on`: send replies to debug chat, `off`: send to main group |
+| `sheet_ContextConfig`   | Name of the sheet storing prompt context/instructions       |
+| `sheet_txCatConfig`     | Name of the sheet with transaction categories               |
+| `telegram_DebugChat`    | Chat ID for debug messages                                  |
+| `telegram_logsChat`     | Chat ID for system logs                                     |
+| `telegram_lastUpdateId` | Tracks last Telegram message processed                      |
 
-## Codebase
-### botHandler
-- Read Telegram message and call for intent detection
-- Act upon the detected intent with the proper function (get/set from the sheets)
-- Send the answer to a dedicated group chat (or channel) set in the configuration
+---
 
-### promptHandler
-- Build both user and system prompts before calling the LLM
-- Prompts are used for: transaction classification, intent detection, spending analytics (with sub-intent), budget analytics, monthly budget setup, enrich the context and instruction database
+## ✨ Features
 
-### llmHandler
-- Build the prompts using available promptHanlder functions
-- Call the LLM to get the results
+Interact with Penny directly in your Telegram group chat using natural language. Supported actions include:
 
-### sheetHandler
-- Functions to retrieve or update the sheet data while relying on the sheets named ranges to retrieve
-- Including: get/set tx, get/set budget, get dashboard data, get/set classification instruction, context, budgeting instructions
+* 📬 Get notified of new transactions via bank emails
+* 📝 Add, modify, or delete transactions manually
+* 📊 View overall or detailed spending reports (e.g., fixed, variable, savings, family fund)
+* 📅 Receive weekly reports and monthly budget suggestions
+* 🎯 Check affordability for purchases or short-term goals
 
-### configuration_template
-Configuration required for the bot to run properly
+---
+
+## 🔐 Data Privacy
+
+* Penny **does not store** user or transaction data.
+* All data lives in your Google Spreadsheet.
+* The bot only tracks the last Telegram update ID to avoid duplicate reads.
+* You can turn off the bot anytime and continue using the spreadsheet manually.
+
+---
+
+## 🕒 Scheduled Jobs
+
+| Task                                  | Frequency    |
+| ------------------------------------- | ------------ |
+| Check bank email for new transactions | Every hour   |
+| Read Telegram group chat              | Every minute |
+| Send weekly spending summary          | Every Monday |
+| Generate monthly budget suggestion    | Every 27th   |
+
+---
+
+## 🧱 Codebase Overview
+
+```text
+.
+├── botHandler.py             # Handles Telegram messages, detects intent, triggers logic
+├── promptHandler.py          # Generates prompts for intent detection and financial reasoning
+├── llmHandler.py             # Sends prompts to the LLM and parses responses
+├── sheetHandler.py           # Reads/writes transaction, budget, and config data from Sheets
+├── configuration_template.py # Sample config required to run the bot
+```
