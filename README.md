@@ -60,9 +60,9 @@ Interact with Penny directly in your Telegram group chat using natural language.
 
 ```text
 .
-├── botHandler.py             # Handles Telegram messages, detects intent, triggers logic
-├── promptHandler.py          # Generates prompts for intent detection and financial reasoning
-├── llmHandler.py             # Sends prompts to the LLM and parses responses
-├── sheetHandler.py           # Reads/writes transaction, budget, and config data from Sheets
-├── configuration_template.py # Sample config required to run the bot
+├── botHandler.js             # Handles Telegram messages, detects intent, triggers logic
+├── promptHandler.js          # Generates prompts for intent detection and financial reasoning
+├── llmHandler.js             # Sends prompts to the LLM and parses responses
+├── sheetHandler.js           # Reads/writes transaction, budget, and config data from Sheets
+├── configuration_template.js # Sample config required to run the bot
 ```
