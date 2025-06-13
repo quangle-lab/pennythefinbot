@@ -179,12 +179,38 @@ function checkTelegramMessages() {
 
           case "createBudget": {
             const { sourceMonth, month } = intentObj;
-            const confirmation = createNewBudget(month, sourceMonth);
-            confirmationLines.push(intentObj.confirmation || confirmation);
 
-            let budgetPrompt = generateBudgetAnalyticsPrompt (month, sourceMonth);  
-            let budgetAnlyticsResp = analyseDataWithOpenAI (budgetPrompt);
-            confirmationLines.push(budgetAnlyticsResp);
+            // Check if budget already exists and ask for confirmation
+            const checkResult = checkAndConfirmCreateBudget(month, sourceMonth);
+
+            if (checkResult.error) {
+              // Error occurred
+              confirmationLines.push(checkResult.error);
+            } else if (checkResult.needsConfirmation) {
+              // Show confirmation message and proceed with creation
+              confirmationLines.push(checkResult.message);
+
+              // Proceed with budget creation after showing the warning/confirmation
+              const confirmation = createNewBudget(month, sourceMonth);
+              confirmationLines.push(confirmation);
+
+              sendLog(intentObj.confirmation);
+
+              // Generate budget analysis
+              let budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth);
+              let budgetAnlyticsResp = analyseDataWithOpenAI(budgetPrompt);
+              confirmationLines.push(budgetAnlyticsResp);
+            } else {
+              // Direct execution (shouldn't happen with current logic)
+              const confirmation = createNewBudget(month, sourceMonth);
+              confirmationLines.push(intentObj.confirmation || confirmation);
+
+              sendLog(intentObj.confirmation);
+
+              let budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth);
+              let budgetAnlyticsResp = analyseDataWithOpenAI(budgetPrompt);
+              confirmationLines.push(budgetAnlyticsResp);
+            }
 
             break;
           }
@@ -201,6 +227,8 @@ function checkTelegramMessages() {
               const line = setBudgetChange(month, group, category, amount, note);
               lines.push(line);
             });
+
+            sendLog (intentObj.confirmation);
 
             confirmationLines.push(intentObj.confirmation || lines.join("\n"));
             break;
@@ -219,11 +247,9 @@ function checkTelegramMessages() {
       }
     });
 
-    // Kết quả cuối cùng
-    if (allConfirmed) {
-      confirmation = confirmationLines.join("\n\n");
-      sendTelegramMessage (confirmation);
-    }
+    // Kết quả cuối cùng    
+    confirmation = confirmationLines.join("\n\n");
+    sendTelegramMessage (confirmation);
   
     // Cập nhật updateId
     props.setProperty("telegram_lastUpdateId", update.update_id.toString());

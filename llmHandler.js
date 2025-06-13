@@ -8,20 +8,7 @@ function classifyTransactionWithOpenAI(subject, body) {
 
   // Sử dụng prompt builder từ promptsHandler
   const promptData = generateClassifyTransactionPrompt(subject, body);
-
-  const payload = {
-    model: 'gpt-4.1',
-    input: [
-      { role: "system", content: promptData.systemMessage },
-      { role: "user", content: promptData.userMessage }
-    ],
-    temperature: 0.5,
-  };
-
-  // Add previous_response_id if available for conversation continuity
-  if (previous_response_id) {
-    payload.previous_response_id = previous_response_id;
-  }
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
 
   const response = UrlFetchApp.fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -36,13 +23,6 @@ function classifyTransactionWithOpenAI(subject, body) {
   try {
     const json = JSON.parse(response.getContentText());
     const reply = JSON.parse(json.output[0].content[0].text);
-
-    // Store the response ID for conversation continuity
-    const new_response_id = json.id;
-    if (new_response_id) {
-      props.setProperty('previous_response_id', new_response_id);
-    }
-
     return reply;
   } catch (e) {
     return {
@@ -58,7 +38,7 @@ function analyseDataWithOpenAI(promptData) {
   const apiKey = OPENAI_TOKEN;
 
   // Create payload with conversation context
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, true);
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
 
   const options = {
     method: "POST",
@@ -99,7 +79,7 @@ function detectUserIntentWithOpenAI(originalText, replyText) {
   const promptData = generateIntentDetectionPrompt(originalText, replyText);
 
   // Create payload with conversation context
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, true);
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
 
   const options = {
     method: "POST",
@@ -112,6 +92,8 @@ function detectUserIntentWithOpenAI(originalText, replyText) {
   };
 
   const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
+  Logger.log (response);
+
   const json = JSON.parse(response.getContentText());
   const content = json.output[0].content[0].text;
 
@@ -136,25 +118,7 @@ function detectNewContextWithOpenAI(originalTx, originalText, replyText) {
   // Sử dụng prompt builder từ promptsHandler
   const promptData = generateDetectNewContextPrompt(originalTx, originalText, replyText);
 
-  const payload = {
-    model: "gpt-4.1",
-    input: [
-      {
-        role: "system",
-        content: promptData.systemMessage
-      },
-      {
-        role: "user",
-        content: promptData.userMessage
-      }
-    ],
-    temperature: 0.6
-  };
-
-  // Add previous_response_id if available for conversation continuity
-  if (previous_response_id) {
-    payload.previous_response_id = previous_response_id;
-  }
+  const payload = createOpenAIPayload (promptData.userMessage, promptData.systemMessage, 0.5, false)
 
   const options = {
     method: "POST",
@@ -189,25 +153,7 @@ function checkAffordabilityWithOpenAI(item, amount, category, group, timeframe) 
   // Sử dụng prompt builder từ promptsHandler
   const promptData = generateAffordabilityAnalysisPrompt(item, amount, category, group, timeframe);
 
-  const payload = {
-    model: "gpt-4.1",
-    input: [
-      {
-        role: "system",
-        content: promptData.systemMessage
-      },
-      {
-        role: "user",
-        content: promptData.userMessage
-      }
-    ],
-    temperature: 0.7
-  };
-
-  // Add previous_response_id if available for conversation continuity
-  if (previous_response_id) {
-    payload.previous_response_id = previous_response_id;
-  }
+  const payload = createOpenAIPayload (promptData.userMessage, promptData.systemMessage, 0.5, true)
 
   const options = {
     method: "POST",
@@ -231,6 +177,28 @@ function checkAffordabilityWithOpenAI(item, amount, category, group, timeframe) 
   return content;
 }
 
+//tạo payload OpenAI với conversation context
+function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true) {
+  const payload = {
+    model: "gpt-4.1",    
+    input: [
+      { role: "system", content: systemMessage },
+      { role: "user", content: userMessage }
+    ],
+    temperature: temperature
+  };
+
+  // Add conversation context if requested
+  if (includeContext) {
+    const context = getConversationContext();
+    if (context.previous_response_id) {
+      payload.previous_response_id = context.previous_response_id;
+    }
+  }
+
+  return payload;
+}
+
 //quản lý conversation context với OpenAI
 function getConversationContext() {
   const props = PropertiesService.getScriptProperties();
@@ -241,6 +209,7 @@ function getConversationContext() {
   };
 }
 
+//cập nhật context
 function updateConversationContext(response_id, interaction_type = 'general') {
   const props = PropertiesService.getScriptProperties();
   const currentTime = new Date().getTime().toString();
@@ -258,6 +227,7 @@ function updateConversationContext(response_id, interaction_type = 'general') {
   }
 }
 
+//reset context khi quá 30 phút
 function resetConversationContext() {
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty('previous_response_id');
@@ -266,26 +236,16 @@ function resetConversationContext() {
   props.deleteProperty('last_interaction_type');
 }
 
-//tạo payload OpenAI với conversation context
-function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true) {
-  const payload = {
-    model: "gpt-4.1",
-    input: [
-      { role: "system", content: systemMessage },
-      { role: "user", content: userMessage }
-    ],
-    temperature: temperature
-  };
-
-  // Add conversation context if requested
-  if (includeContext) {
-    const context = getConversationContext();
-    if (context.previous_response_id) {
-      payload.previous_response_id = context.previous_response_id;
-    }
-  }
-
-  return payload;
+//log conversation context để debug
+function logConversationContext() {
+  const context = getConversationContext();
+  Logger.log('Conversation Context:', {
+    has_previous_response: !!context.previous_response_id,
+    conversation_start: context.conversation_start,
+    last_interaction: context.last_interaction,
+    time_since_start: context.conversation_start ?
+      (new Date().getTime() - parseInt(context.conversation_start)) / 1000 / 60 + ' minutes' : 'N/A'
+  });
 }
 
 //reset conversation khi cần thiết (ví dụ: bắt đầu chủ đề mới)
@@ -310,16 +270,4 @@ function resetConversationIfNeeded(forceReset = false) {
   }
 
   return false;
-}
-
-//log conversation context để debug
-function logConversationContext() {
-  const context = getConversationContext();
-  Logger.log('Conversation Context:', {
-    has_previous_response: !!context.previous_response_id,
-    conversation_start: context.conversation_start,
-    last_interaction: context.last_interaction,
-    time_since_start: context.conversation_start ?
-      (new Date().getTime() - parseInt(context.conversation_start)) / 1000 / 60 + ' minutes' : 'N/A'
-  });
 }
