@@ -171,9 +171,22 @@ function checkTelegramMessages() {
             sendTelegramMessage (intentObj.confirmation);
 
             //gọi hàm check khả năng mua
-            let affordabilityCheck = checkAffordabilityWithOpenAI(item, amount, category, group, timeframe);       
-            confirmationLines.push(affordabilityCheck);   
-            
+            let affordabilityCheck = checkAffordabilityWithOpenAI(item, amount, category, group, timeframe);
+            confirmationLines.push(affordabilityCheck);
+
+            break;
+          }
+
+          case "coaching": {
+            // Extract user question from the reply field
+            const userQuestion = intentObj.request || replyText;
+
+            sendTelegramMessage("🎯 Đang phân tích tình hình tài chính và chuẩn bị lời khuyên coaching cho bạn...");
+
+            // Get comprehensive financial coaching advice
+            const coachingAdvice = handleFinancialCoachingWithAI(userQuestion);
+            confirmationLines.push(coachingAdvice);
+
             break;
           }
 
@@ -283,7 +296,10 @@ function sendTelegramMessage (message) {
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
     });
-    return;
+
+  Logger.log (response);
+
+  return;
 }
 
 //gửi log Telegram

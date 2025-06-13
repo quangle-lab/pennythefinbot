@@ -177,6 +177,51 @@ function checkAffordabilityWithOpenAI(item, amount, category, group, timeframe) 
   return content;
 }
 
+//xử lý yêu cầu coaching tài chính
+function handleFinancialCoachingWithAI(userQuestion) {
+  const apiKey = OPENAI_TOKEN;
+
+  // Check if we need to reset conversation (new coaching session)
+  resetConversationIfNeeded();
+
+  // Log current conversation context for debugging
+  logConversationContext();
+
+  // Build comprehensive coaching prompt with financial data
+  const coachingPrompt = generateFinancialCoachingPrompt(userQuestion);
+
+  // Create payload with conversation context
+  const payload = createOpenAIPayload(coachingPrompt.systemMessage, coachingPrompt.userMessage, 0.7, false);
+
+  const options = {
+    method: "POST",
+    contentType: "application/json",
+    headers: {
+      Authorization: `Bearer ${apiKey}`
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
+
+    Logger.log  (response);
+
+    const json = JSON.parse(response.getContentText());
+    const coachingAdvice = json.output[0].content[0].text;
+
+    // Update conversation context
+    updateConversationContext(json.id, 'financial_coaching');
+
+    Logger.log('Financial Coaching Response:', coachingAdvice);
+
+    return coachingAdvice;
+  } catch (e) {
+    return "😱 Không thể cung cấp lời khuyên tài chính. Đã xảy ra lỗi: " + e.toString();
+  }
+}
+
 //tạo payload OpenAI với conversation context
 function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true) {
   const payload = {
@@ -271,3 +316,4 @@ function resetConversationIfNeeded(forceReset = false) {
 
   return false;
 }
+

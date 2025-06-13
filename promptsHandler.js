@@ -67,7 +67,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
               Hỏi: tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?
               Trả lời: căn cứ vào hoàn cảnh gia đình, bạn có thể tiết kiệm những mục như ăn ngoài, mua sắm, hạn chế thuê bao số như Netflix
         - others: các intent khác, kèm theo ghi chú trong mục note
-          Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, kiểm tra khả năng chi trả cho các khoản chi tiêu
+          Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, kiểm tra khả năng chi trả cho các khoản chi tiêu, và coaching tài chính cá nhân
           
   ## Tin nhắn nhiều ý định
   Trong một tin nhắn của khách hàng có thể có nhiều ý định:
@@ -144,8 +144,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
 
     ### Yêu cầu tư vấn      
       {"intent":"coaching", 
-        "reply":"câu trả lời của bạn cho khách hàng",
-        "note:"ghi chú của bạn về ý định của khách hàng để có thể hỗ trợ tốt hơn lần sau"
+        "request":"yêu cầu coaching của khách hàng"       
       }
     
     ### Yêu cầu khác ngoài danh sách phân loại      
@@ -539,13 +538,13 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
 
   ${budgetInstructions}
 
-  ##📊Tình hình tài chính tháng hiện tại (${currentMonth})
+  ## Tình hình tài chính tháng hiện tại (${currentMonth})
   ${currentMonthData}
 
-  ##📋Dự toán tháng tới (${nextMonth})
+  ## Dự toán tháng tới (${nextMonth})
   ${nextMonthBudget}
 
-  ##💰Số dư các quỹ hiện tại
+  ## Số dư các quỹ hiện tại
   ${formattedFundBalances}
 
   🛒 **Khoản chi tiêu cần phân tích:**
@@ -595,9 +594,117 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
   return {
     systemMessage: `The current time is ${currentTime}
       ## PERSISTENCE
-      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram.
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
       Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.`,
     userMessage: affordabilityPrompt
+  };
+}
+
+//prompt coaching tài chính cá nhân
+function generateFinancialCoachingPrompt(userQuestion) {
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  const currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
+
+  // Calculate last 3 months
+  const now = new Date();
+  const months = [];
+  for (let i = 2; i >= 0; i--) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(Utilities.formatDate(monthDate, Session.getScriptTimeZone(), "MM/yyyy"));
+  }
+
+  // Get family context and budget instructions
+  const familyContext = getFamilyContext();
+  const budgetInstructions = getBudgetInstructions();
+
+  // Get dashboard data for last 3 months
+  const dashboardData = [];
+  months.forEach(month => {
+    const monthData = getDashboardData(month);
+    dashboardData.push(`📊 **Tháng ${month}:**\n${monthData}\n`);
+  });
+
+  // Get budget data for last 3 months
+  const budgetData = [];
+  months.forEach(month => {
+    const monthBudget = getBudgetData(month);
+    budgetData.push(`💶 **Dự toán tháng ${month}:**\n${monthBudget}\n`);
+  });
+
+  // Get current fund balances
+  const fundBalances = getFundBalances("all");
+  const formattedFundBalances = formatFundBalances(fundBalances);
+
+  let coachingPrompt = `
+  🎯 **Yêu cầu coaching từ khách hàng:**
+  "${userQuestion}"
+
+  📝 **Yêu cầu coaching:**
+  Dựa trên tất cả thông tin tài chính trên và câu hỏi của khách hàng, hãy đưa ra lời khuyên coaching tài chính cá nhân chuyên nghiệp và thực tế.
+
+  **Yêu cầu trình bày:**
+  - Ngôn ngữ: Tiếng Việt, thân thiện như một chuyên gia tài chính cá nhân
+  - Giới hạn 400 từ
+  - Sử dụng emoji phù hợp để làm nổi bật
+  - Đưa ra con số cụ thể và tính toán rõ ràng từ dữ liệu thực tế
+  - Dùng định dạng markdown cho Telegram
+  - Tập trung vào lời khuyên thực tế và có thể thực hiện được
+  - Luôn dựa trên dữ liệu cụ thể để đưa ra khuyến nghị
+
+  **Cấu trúc phản hồi:**
+
+  🎯 **Phân tích tình hình tài chính**
+  _Ngày phân tích: ${currentTime}_
+
+  **📊 Đánh giá tổng quan:**
+  - Phân tích xu hướng thu chi 3 tháng gần nhất
+  - Đánh giá hiệu quả thực hiện dự toán
+  - Tình hình quỹ và khả năng tài chính hiện tại
+
+  **🎯 Trả lời câu hỏi cụ thể:**
+  - Giải đáp trực tiếp yêu cầu của khách hàng
+  - Đưa ra lời khuyên cụ thể dựa trên dữ liệu thực tế
+  - Phân tích ưu nhược điểm của tình hình hiện tại
+
+  **💡 Khuyến nghị hành động:**
+  - Các bước cụ thể khách hàng nên thực hiện
+  - Điều chỉnh ngân sách và chi tiêu (nếu cần)
+  - Chiến lược quản lý quỹ và tiết kiệm
+
+  **⚠️ Cảnh báo và lưu ý:**
+  - Những rủi ro tài chính cần chú ý
+  - Các thói quen chi tiêu cần cải thiện
+  - Mục tiêu tài chính cần điều chỉnh
+
+  **🎯 Kế hoạch dài hạn:**
+  - Đề xuất mục tiêu tài chính 3-6 tháng tới
+  - Chiến lược tích lũy và đầu tư
+  - Kế hoạch cải thiện tình hình tài chính
+
+  # Dữ liệu
+  ## Gia đình
+  ${familyContext}
+
+  ## Hướng dẫn dự toán
+  ${budgetInstructions}
+
+  ## Dữ liệu tài chính 3 tháng gần nhất
+  ${dashboardData.join('\n')}
+
+  ## Dự toán 3 tháng gần nhất
+  ${budgetData.join('\n')}
+
+  ## Số dư các quỹ hiện tại
+  ${formattedFundBalances}
+  `;
+
+  return {
+    systemMessage: `Bạn là một chuyên gia coaching tài chính cá nhân với nhiều năm kinh nghiệm.
+    Nhiệm vụ của bạn là phân tích dữ liệu tài chính chi tiết và đưa ra lời khuyên coaching chuyên nghiệp, thực tế.
+    Bạn luôn dựa trên dữ liệu cụ thể để đưa ra khuyến nghị và giúp khách hàng cải thiện tình hình tài chính.
+    Phong cách của bạn là thân thiện, dễ hiểu nhưng chuyên nghiệp và có trách nhiệm.
+    Mốc thời gian hiện tại là ${currentTime}.`,
+    userMessage: coachingPrompt
   };
 }
