@@ -8,8 +8,15 @@ function processBankAlerts() {
 
     for (let message of messages) {    
       // Trích xuất thông tin tựa và nội dung từ email
-      const body = message.getPlainBody();
+      let body = trimCICMailBody(message.getPlainBody());
       const subject = message.getSubject();    
+
+
+      //xóa các ký tự đặc biệt
+      body = body.replace(/[*&]/g, ' ');
+
+      Logger.log (subject);
+      Logger.log (body);
 
       // Gọi OpenAI để phân loại thông minh tab, mục, số tiền, nơi phát sinh giao dịch, ghi chú, ghi của ngân hàng, ngày giao dịch
       const aiResult = classifyTransactionWithOpenAI(subject, body);
@@ -141,4 +148,15 @@ function isValidTransaction(aiResult, subject, body, message = null) {
   return true;
 }
 
-
+//cắt gọn mail body
+function trimCICMailBody(mailBody) {
+  const startIndex = mailBody.indexOf("Monsieur,");
+  const endIndex = mailBody.indexOf("Cordialement,");
+  
+  if (startIndex >= 0 && endIndex > startIndex) {
+    return mailBody.substring(startIndex+10, endIndex).trim();
+  } else {
+    // fallback: return original body if pattern not found
+    return mailBody;
+  }
+}
