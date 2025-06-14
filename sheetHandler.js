@@ -1,12 +1,12 @@
 //quản lý và lấy dữ liệu từ sheets dưới dạng text
 
-//kiểm tra và xác nhận tạo budget mới
-function checkAndConfirmCreateBudget(newMonthText, sourceMonthText) {
+
+//---------------BUDGET-------------------//
+//tạo budget có chọn lọc - chỉ tạo các dòng chưa tồn tại
+function createBudgetSelectively(newMonthText, sourceMonthText) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("💶Dự toán");
   if (!sheet) {
     return {
-      exists: false,
-      needsConfirmation: false,
       error: "❌ Không tìm thấy sheet '💶Dự toán'"
     };
   }
@@ -14,9 +14,9 @@ function checkAndConfirmCreateBudget(newMonthText, sourceMonthText) {
   const data = sheet.getDataRange().getValues();
   const timezone = Session.getScriptTimeZone();
 
-  // Check if budget for newMonthText already exists
-  const existingBudgetItems = [];
-  const sourceMonthItems = [];
+  // Step 1: Check existing budget lines for the new month
+  const existingBudgetLines = [];
+  const existingCategories = new Set();
 
   data.forEach((row, index) => {
     if (index === 0) return; // Skip header
@@ -28,13 +28,28 @@ function checkAndConfirmCreateBudget(newMonthText, sourceMonthText) {
     const note = row[4];
 
     if (rowMonthText === newMonthText) {
-      existingBudgetItems.push({
+      existingBudgetLines.push({
         group: group,
         category: category,
         amount: amount,
         note: note || ''
       });
+      existingCategories.add(category);
     }
+  });
+
+  // Step 2: Get source month data and filter out existing categories
+  const sourceMonthItems = [];
+  const newItemsToCreate = [];
+
+  data.forEach((row, index) => {
+    if (index === 0) return; // Skip header
+
+    const rowMonthText = Utilities.formatDate(row[0], timezone, "MM/yyyy");
+    const group = row[1];
+    const category = row[2];
+    const amount = row[3];
+    const note = row[4];
 
     if (rowMonthText === sourceMonthText) {
       sourceMonthItems.push({
@@ -43,220 +58,73 @@ function checkAndConfirmCreateBudget(newMonthText, sourceMonthText) {
         amount: amount,
         note: note || ''
       });
+
+      // Only add to creation list if category doesn't exist in new month
+      if (!existingCategories.has(category)) {
+        newItemsToCreate.push({
+          group: group,
+          category: category,
+          amount: Math.round(amount*100)/100,  
+          note: ''
+        });
+      }
     }
   });
-
-  // Check if budget already exists for the new month
-  if (existingBudgetItems.length > 0) {
-    let message = `🔍 Tìm thấy dự toán hiện tại cho tháng *${newMonthText}* với ${existingBudgetItems.length} mục:\n\n`;
-
-    // Group by category for better display
-    const groupedItems = {};
-    existingBudgetItems.forEach(item => {
-      if (!groupedItems[item.group]) groupedItems[item.group] = [];
-      groupedItems[item.group].push(`  • ${item.category}: €${item.amount}`);
-    });
-
-    Object.keys(groupedItems).forEach(group => {
-      message += `**${group}:**\n${groupedItems[group].join('\n')}\n\n`;
-    });
-
-    message += `❓ Bạn có muốn ghi đè dự toán hiện tại bằng dữ liệu từ tháng *${sourceMonthText}* không?`;
-
-    return {
-      exists: true,
-      needsConfirmation: true,
-      existingItems: existingBudgetItems,
-      sourceItems: sourceMonthItems,
-      message: message,
-      newMonthText: newMonthText,
-      sourceMonthText: sourceMonthText
-    };
-  }
 
   // Check if source month has data
   if (sourceMonthItems.length === 0) {
     return {
-      exists: false,
-      needsConfirmation: false,
       error: `❌ Không tìm thấy dữ liệu dự toán cho tháng nguồn *${sourceMonthText}*`
     };
   }
 
-  // No existing budget for new month, show what will be created
-  let message = `📝 Tạo dự toán mới cho tháng *${newMonthText}* dựa trên tháng *${sourceMonthText}* với ${sourceMonthItems.length} mục:\n\n`;
+  // Step 3: Create new budget lines (skip existing ones)
+  let createdCount = 0;
+  if (newItemsToCreate.length > 0) {
+    const newRows = [];
+    newItemsToCreate.forEach(item => {
+      const newRow = [newMonthText, item.group, item.category, item.amount, item.note];
+      newRows.push(newRow);
+    });
 
-  const groupedSourceItems = {};
-  sourceMonthItems.forEach(item => {
-    if (!groupedSourceItems[item.group]) groupedSourceItems[item.group] = [];
-    groupedSourceItems[item.group].push(`  • ${item.category}: €${item.amount}`);
-  });
+    if (newRows.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+      createdCount = newRows.length;
+    }
+  }
 
-  Object.keys(groupedSourceItems).forEach(group => {
-    message += `**${group}:**\n${groupedSourceItems[group].join('\n')}\n\n`;
-  });
+  // Step 4: Generate summary message
+  let summary = `✅ **Tạo dự toán tháng ${newMonthText}:**\n\n`;
 
-  message += `❓ Bạn có muốn tạo dự toán này không?`;
+  if (createdCount > 0) {
+    summary += `➕ Đã tạo ${createdCount} dự toán mới từ tháng ${sourceMonthText}\n`;
+
+    // Group new items by category for display
+    const groupedNewItems = {};
+    newItemsToCreate.forEach(item => {
+      if (!groupedNewItems[item.group]) groupedNewItems[item.group] = [];
+      groupedNewItems[item.group].push(`  • ${item.category}: €${item.amount}`);
+    });
+
+    Object.keys(groupedNewItems).forEach(group => {
+      summary += `\n**${group}:**\n${groupedNewItems[group].join('\n')}`;
+    });
+  } else {
+    summary += `ℹ️ Không có dự toán mới nào được tạo (tất cả đã tồn tại)`;
+  }
+
+  if (existingBudgetLines.length > 0) {
+    summary += `\n\n⚠️ Đã bỏ qua ${existingBudgetLines.length} dự toán đã tồn tại`;
+  }
 
   return {
-    exists: false,
-    needsConfirmation: true,
-    sourceItems: sourceMonthItems,
-    message: message,
+    success: true,
+    summary: summary,
+    existingLines: existingBudgetLines,
+    createdCount: createdCount,
+    skippedCount: existingBudgetLines.length,
     newMonthText: newMonthText,
     sourceMonthText: sourceMonthText
-  };
-}
-
-//tạo budget cho tháng newMonthText (MM/yyyy) dựa trên tháng sourceMonthText (MM/yyyy)
-function createNewBudget (newMonthText, sourceMonthText) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("💶Dự toán");
-  const data = sheet.getDataRange().getValues();
-
-  const timezone = Session.getScriptTimeZone();
-
-  const newRows = [];
-  data.forEach((row, index) => {
-    if (index === 0) return;
-    const rowMonthText = Utilities.formatDate(row[0], timezone, "MM/yyyy");
-    if (rowMonthText === sourceMonthText) {
-      const newRow = [...row];
-      newRow[0] = newMonthText;
-      newRows.push(newRow);
-    }
-  });
-
-  if (newRows.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-  }
-
-  let confirmation = `✅Đã tạo budget mới cho tháng *${newMonthText}* trong tab *💶Dự toán* với ${newRows.length} mục`
-
-  return confirmation;
-}
-
-//thực hiện tạo budget sau khi đã xác nhận
-function executeConfirmedBudgetCreation(newMonthText, sourceMonthText, overwriteExisting = false) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("💶Dự toán");
-    if (!sheet) {
-      return {
-        success: false,
-        error: "❌ Không tìm thấy sheet '💶Dự toán'"
-      };
-    }
-
-    // If overwriting existing budget, delete existing entries first
-    if (overwriteExisting) {
-      const data = sheet.getDataRange().getValues();
-      const timezone = Session.getScriptTimeZone();
-      const rowsToDelete = [];
-
-      // Find rows to delete (in reverse order to avoid index shifting)
-      for (let i = data.length - 1; i >= 1; i--) {
-        const row = data[i];
-        const rowMonthText = Utilities.formatDate(row[0], timezone, "MM/yyyy");
-        if (rowMonthText === newMonthText) {
-          rowsToDelete.push(i + 1); // +1 because sheet rows are 1-based
-        }
-      }
-
-      // Delete existing rows
-      rowsToDelete.forEach(rowIndex => {
-        sheet.deleteRow(rowIndex);
-      });
-    }
-
-    // Create new budget
-    const result = createNewBudget(newMonthText, sourceMonthText);
-
-    return {
-      success: true,
-      message: result,
-      overwritten: overwriteExisting
-    };
-
-  } catch (error) {
-    return {
-      success: false,
-      error: `❌ Lỗi khi tạo dự toán: ${error.toString()}`
-    };
-  }
-}
-
-//kiểm tra và xác nhận thay đổi budget
-function checkAndConfirmBudgetChange(month, group, category, amount, note) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('💶Dự toán');
-  if (!sheet) {
-    return {
-      exists: false,
-      needsConfirmation: false,
-      error: "❌ Không tìm thấy sheet '💶Dự toán'"
-    };
-  }
-
-  const data = sheet.getDataRange().getValues();
-  const timezone = Session.getScriptTimeZone();
-
-  // Check if there's already a line with the same month, group, category
-  for (let i = 1; i < data.length; i++) { // Skip header row
-    const row = data[i];
-    const dateCell = row[0];
-    const groupCell = row[1];
-    const categoryCell = row[2];
-    const currentAmount = row[3];
-    const currentNote = row[4];
-
-    const rowMonth = Utilities.formatDate(new Date(dateCell), timezone, "MM/yyyy");
-
-    if (rowMonth === month && groupCell === group && categoryCell === category) {
-      // Found existing budget line
-      let message = `🔍 Tìm thấy dự toán hiện tại cho *${category}* (${group}) tháng *${month}*:\n\n`;
-      message += `📊 *Hiện tại*: €${currentAmount}`;
-      if (currentNote) {
-        message += ` - _${currentNote}_`;
-      }
-      message += `\n📝 *Mới*: €${amount}`;
-      if (note) {
-        message += ` - _${note}_`;
-      }
-      message += `\n\n❓ Bạn có muốn cập nhật dự toán này không?`;
-
-      return {
-        exists: true,
-        needsConfirmation: true,
-        existingRow: {
-          rowNumber: i + 1,
-          month: month,
-          group: group,
-          category: category,
-          currentAmount: currentAmount,
-          currentNote: currentNote || ''
-        },
-        newBudget: {
-          month: month,
-          group: group,
-          category: category,
-          amount: amount,
-          note: note || ''
-        },
-        message: message
-      };
-    }
-  }
-
-  // No existing budget found
-  return {
-    exists: false,
-    needsConfirmation: true,
-    message: `📝 Tạo dự toán mới cho *${category}* (${group}) tháng *${month}*: €${amount}\n\n❓ Bạn có muốn thêm dự toán này không?`,
-    newBudget: {
-      month: month,
-      group: group,
-      category: category,
-      amount: amount,
-      note: note || ''
-    }
   };
 }
 
@@ -322,6 +190,7 @@ function getBudgetData (monthText) {
   return monthBudgetData;
 }
 
+//---------------SPENDING-------------------//
 //lấy dữ liệu dashboard cho tháng monthText (MM/yyyy)
 function getDashboardData (monthText) {  
 
@@ -386,150 +255,6 @@ function getDashboardData (monthText) {
     ${dataSections.join("\n\n")}
   `;  
   return monthDashboardData;
-}
-
-//lấy danh sách các nhóm và mục giao dịch
-function getTxCat() {
-  const namedRanges = [
-    "ThuNhap",
-    "ChiPhiCoDinh",
-    "ChiPhiBienDoi",
-    "QuyGiaDinh",
-    "QuyMucDich",
-    "TietKiem"
-  ];
-
-  const catTxSheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-
-  const promptParts = [];
-  promptParts.push("Các giao dịch tài chính được phân vào các nhóm/mục như sau:");
-
-  namedRanges.forEach((rangeName, index) => {
-    const namedRange = catTxSheet.getRangeByName(rangeName);
-    if (!namedRange) return;
-
-    const sheet = namedRange.getSheet();
-    const startRow = namedRange.getRow();    
-    const numRows = namedRange.getNumRows();
-
-    // Mở rộng từ cột A đến C => width = 3
-    const fullRange = sheet.getRange(startRow, 1, numRows, 3);
-    const values = fullRange.getValues();
-
-    // Lấy tên nhóm từ cột A (duy nhất trong đoạn này)
-    const uniqueGroupNames = [...new Set(values.map(row => row[0]).filter(name => !!name))];
-    const groupName = uniqueGroupNames[0] || rangeName;
-
-    const items = [];
-    values.forEach(([, muc, mieuta]) => {
-      if (muc && mieuta) {
-        items.push(`  ${muc}: ${mieuta}`);
-      }
-    });
-
-    if (items.length > 0) {
-      promptParts.push(`\n${index + 1}/ ${groupName}:\n${items.join('\n')}`);
-    }
-  });
-  
-  const instructionCatPrompt = promptParts.join("\n");
-  return instructionCatPrompt;
-}
-
-//lấy hoàn cảnh gia đình
-function getFamilyContext() {
-  const props = PropertiesService.getScriptProperties();
-  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return "";
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const rows = data.slice(1);
-
-  const contextMap = new Map (); // Nhóm -> array of lines
-
-  rows.forEach(([nhom, ten, noidung]) => {
-    if (!nhom || !ten || !noidung) return;
-    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
-    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
-  });
-
-  const parts = [];
-
-  if (contextMap.has("Hoàn cảnh")) {
-    parts.push("🏠 Hoàn cảnh hộ gia đình:");
-    parts.push(...contextMap.get("Hoàn cảnh"));
-  }
-
-  let contextPrompt = parts.join("\n");
-  return contextPrompt;
-}
-
-//lấy chỉ dẫn phân loại giao dịch
-function getCategoriseInstructions() {
-  const props = PropertiesService.getScriptProperties();
-  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return "";
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const rows = data.slice(1);
-
-  const contextMap = new Map (); // Nhóm -> array of lines
-
-  rows.forEach(([nhom, ten, noidung]) => {
-    if (!nhom || !ten || !noidung) return;
-    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
-    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
-  });
-
-  const parts = [];
-
-   if (contextMap.has("Chỉ dẫn phân loại")) {
-    parts.push("🔍 Hướng dẫn phân loại giao dịch:");
-    parts.push(...contextMap.get("Chỉ dẫn phân loại"));
-  }
-
-  let contextPrompt = parts.join("\n");  
-  return contextPrompt;
-}
-
-//lấy chỉ dẫn tạo dự toán chi tiêu
-function getBudgetInstructions() {
-  const props = PropertiesService.getScriptProperties();
-  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return "";
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const rows = data.slice(1);
-
-  const contextMap = new Map (); // Nhóm -> array of lines
-
-  rows.forEach(([nhom, ten, noidung]) => {
-    if (!nhom || !ten || !noidung) return;
-    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
-    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
-  });
-
-  const parts = [];
-
-  if (contextMap.has("Chỉ dẫn dự toán")) {
-    parts.push("💶 Hướng dẫn dự toán:");
-    parts.push(...contextMap.get("Chỉ dẫn dự toán"));
-  }
-
-  let contextPrompt = parts.join("\n");  
-  return contextPrompt;
 }
 
 //lấy dữ liệu chi tiêu của tháng monthText theo type -- cố định (fix) hoặc biến đổi (var)
@@ -739,6 +464,8 @@ function addConfirmedTransaction(sheetName, transactionData) {
   }
 }
 
+
+//---------------FUNDS-------------------//
 //lấy số dư hiện tại của Quỹ -- gia đình (rainy), mục đích (target) hoặc tiết kiệm (saving)
 function getFundBalances(type) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();  
@@ -912,3 +639,147 @@ function formatFundBalances(balanceData) {
   }
 }
 
+//---------------CONTEXT-------------------//
+//lấy danh sách các nhóm và mục giao dịch
+function getTxCat() {
+  const namedRanges = [
+    "ThuNhap",
+    "ChiPhiCoDinh",
+    "ChiPhiBienDoi",
+    "QuyGiaDinh",
+    "QuyMucDich",
+    "TietKiem"
+  ];
+
+  const catTxSheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const promptParts = [];
+  promptParts.push("Các giao dịch tài chính được phân vào các nhóm/mục như sau:");
+
+  namedRanges.forEach((rangeName, index) => {
+    const namedRange = catTxSheet.getRangeByName(rangeName);
+    if (!namedRange) return;
+
+    const sheet = namedRange.getSheet();
+    const startRow = namedRange.getRow();    
+    const numRows = namedRange.getNumRows();
+
+    // Mở rộng từ cột A đến C => width = 3
+    const fullRange = sheet.getRange(startRow, 1, numRows, 3);
+    const values = fullRange.getValues();
+
+    // Lấy tên nhóm từ cột A (duy nhất trong đoạn này)
+    const uniqueGroupNames = [...new Set(values.map(row => row[0]).filter(name => !!name))];
+    const groupName = uniqueGroupNames[0] || rangeName;
+
+    const items = [];
+    values.forEach(([, muc, mieuta]) => {
+      if (muc && mieuta) {
+        items.push(`  ${muc}: ${mieuta}`);
+      }
+    });
+
+    if (items.length > 0) {
+      promptParts.push(`\n${index + 1}/ ${groupName}:\n${items.join('\n')}`);
+    }
+  });
+  
+  const instructionCatPrompt = promptParts.join("\n");
+  return instructionCatPrompt;
+}
+
+//lấy hoàn cảnh gia đình
+function getFamilyContext() {
+  const props = PropertiesService.getScriptProperties();
+  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return "";
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+
+  const contextMap = new Map (); // Nhóm -> array of lines
+
+  rows.forEach(([nhom, ten, noidung]) => {
+    if (!nhom || !ten || !noidung) return;
+    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
+    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
+  });
+
+  const parts = [];
+
+  if (contextMap.has("Hoàn cảnh")) {
+    parts.push("🏠 Hoàn cảnh hộ gia đình:");
+    parts.push(...contextMap.get("Hoàn cảnh"));
+  }
+
+  let contextPrompt = parts.join("\n");
+  return contextPrompt;
+}
+
+//lấy chỉ dẫn phân loại giao dịch
+function getCategoriseInstructions() {
+  const props = PropertiesService.getScriptProperties();
+  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return "";
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+
+  const contextMap = new Map (); // Nhóm -> array of lines
+
+  rows.forEach(([nhom, ten, noidung]) => {
+    if (!nhom || !ten || !noidung) return;
+    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
+    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
+  });
+
+  const parts = [];
+
+   if (contextMap.has("Chỉ dẫn phân loại")) {
+    parts.push("🔍 Hướng dẫn phân loại giao dịch:");
+    parts.push(...contextMap.get("Chỉ dẫn phân loại"));
+  }
+
+  let contextPrompt = parts.join("\n");  
+  return contextPrompt;
+}
+
+//lấy chỉ dẫn tạo dự toán chi tiêu
+function getBudgetInstructions() {
+  const props = PropertiesService.getScriptProperties();
+  const sheetName = props.getProperty('sheet_ContextConfig') || '🤖Tùy chỉnh Prompts';
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return "";
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+
+  const contextMap = new Map (); // Nhóm -> array of lines
+
+  rows.forEach(([nhom, ten, noidung]) => {
+    if (!nhom || !ten || !noidung) return;
+    if (!contextMap.has(nhom)) contextMap.set(nhom, []);
+    contextMap.get(nhom).push(`- ${ten}: ${noidung}`);
+  });
+
+  const parts = [];
+
+  if (contextMap.has("Chỉ dẫn dự toán")) {
+    parts.push("💶 Hướng dẫn dự toán:");
+    parts.push(...contextMap.get("Chỉ dẫn dự toán"));
+  }
+
+  let contextPrompt = parts.join("\n");  
+  return contextPrompt;
+}

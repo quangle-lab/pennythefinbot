@@ -9,7 +9,6 @@ function checkTelegramMessages() {
 
   //Prompt settings
   const promptsSettings = props.getProperty("sheet_ContextConfig") || '🤖Tùy chỉnh Prompts';
-  const debugChat = props.getProperty("telegram_DebugChat") || '-4847069897';
   
   //lấy tin nhắn từ Telegram
   const lastUpdateId = props.getProperty("telegram_lastUpdateId") || '0';
@@ -151,10 +150,11 @@ function checkTelegramMessages() {
             if (intentObj.month && intentObj.year) {
               monthText = `${intentObj.month}/${intentObj.year}`;
             }
+            sendTelegramMessage (intentObj.confirmation);
 
             const dashboardPrompt = generateExpenseAnalyticsPrompt(replyText, monthText, "dashboard");
             const result = analyseDataWithOpenAI(dashboardPrompt);
-            confirmationLines.push(intentObj.confirmation || result);
+            confirmationLines.push(result);
             break;
           }
 
@@ -165,13 +165,12 @@ function checkTelegramMessages() {
             break;
           }
 
-          case "affordTest": {
+          case "affordTest": {            
             const { item, amount, category, group, timeframe } = intentObj;
-
             sendTelegramMessage (intentObj.confirmation);
 
             //gọi hàm check khả năng mua
-            let affordabilityCheck = checkAffordabilityWithOpenAI(item, amount, category, group, timeframe);
+            let affordabilityCheck = checkAffordabilityWithOpenAI(replyText, item, amount, category, group, timeframe);
             confirmationLines.push(affordabilityCheck);
 
             break;
@@ -180,8 +179,7 @@ function checkTelegramMessages() {
           case "coaching": {
             // Extract user question from the reply field
             const userQuestion = intentObj.request || replyText;
-
-            sendTelegramMessage("🎯 Đang phân tích tình hình tài chính và chuẩn bị lời khuyên coaching cho bạn...");
+            sendTelegramMessage(intentObj.confirmation);
 
             // Get comprehensive financial coaching advice
             const coachingAdvice = handleFinancialCoachingWithAI(userQuestion);
@@ -190,36 +188,30 @@ function checkTelegramMessages() {
             break;
           }
 
-          case "createBudget": {
+          case "createBudget": {            
             const { sourceMonth, month } = intentObj;
+            sendTelegramMessage(intentObj.confirmation);
 
-            // Check if budget already exists and ask for confirmation
-            const checkResult = checkAndConfirmCreateBudget(month, sourceMonth);
+            // Use the new selective budget creation function
+            const creationResult = createBudgetSelectively(month, sourceMonth);
 
-            if (checkResult.error) {
+            if (creationResult.error) {
               // Error occurred
-              confirmationLines.push(checkResult.error);
-            } else if (checkResult.needsConfirmation) {
-              // Show confirmation message and proceed with creation
-              confirmationLines.push(checkResult.message);
+              confirmationLines.push(creationResult.error);
+            } else {
+              // Show creation summary
+              confirmationLines.push(creationResult.summary);
 
-              // Proceed with budget creation after showing the warning/confirmation
-              const confirmation = createNewBudget(month, sourceMonth);
-              confirmationLines.push(confirmation);
-
-              sendLog(intentObj.confirmation);
+              // If there are existing budget lines, show them and ask for modification
+              if (creationResult.existingLines && creationResult.existingLines.length > 0) {
+                let existingMessage = "\n📋 **Các dự toán đã tồn tại:**\n\n";
+                creationResult.existingLines.forEach((line, index) => {
+                  existingMessage += `${index + 1}. **${line.group}** / ${line.category} / €${line.amount}\n`;
+                });                
+                confirmationLines.push(existingMessage);
+              }              
 
               // Generate budget analysis
-              let budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth);
-              let budgetAnlyticsResp = analyseDataWithOpenAI(budgetPrompt);
-              confirmationLines.push(budgetAnlyticsResp);
-            } else {
-              // Direct execution (shouldn't happen with current logic)
-              const confirmation = createNewBudget(month, sourceMonth);
-              confirmationLines.push(intentObj.confirmation || confirmation);
-
-              sendLog(intentObj.confirmation);
-
               let budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth);
               let budgetAnlyticsResp = analyseDataWithOpenAI(budgetPrompt);
               confirmationLines.push(budgetAnlyticsResp);
@@ -338,7 +330,7 @@ function initMonthlyBudget () {
   const nextMonthText = Utilities.formatDate(nextMonth, Session.getScriptTimeZone(), monthFormat);
 
   //tạo budget tháng mới trong Tab dự toán
-  let confirmationNewBudget = createNewBudget (nextMonthText, thisMonthText);
+  let confirmationNewBudget = createBudgetSelectively (nextMonthText, thisMonthText);
   sendTelegramMessage (confirmationNewBudget);
 
   //phân tích điểm cần cải thiện của dự toán tháng mới và gửi cho người dùng

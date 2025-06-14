@@ -114,13 +114,14 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "intent":"createBudget", 
         "sourceMonth":"tháng/năm nguồn dữ liệu để tạo dự toán mới theo định dạnh MM/yyyy. Nếu khách hàng không nói tháng, mặc định là tháng hiện tại.",
         "month":"tháng/năm dự toán theo định dạnh MM/yyyy. Nếu khách hàng không nói tháng, mặc định là tháng tới",
-        "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng",
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",
       }
 
     ### Yêu cầu thay đổi dự toán: danh sách các thay đổi cần áp dụng cho dự toán. Nếu khách hàng không phản đối các điều chỉnh trong tin nhắn của bạn, gộp luôn các thay đổi đó vào danh sách.
       {
         "intent":"modifyBudget", 
         "month":"tháng/năm dự toán theo định dạnh MM/yyyy. Nếu khách hàng không nói năm, mặc định là năm hiện tại.",
+        "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng",
         "changes": [
           {
             "group":"nhóm dự toán". Sử dụng đúng tên nhóm như trong Chỉ dẫn phân loại.
@@ -139,16 +140,19 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "category":"mục phân loại dự kiến cho khoản chi này theo danh sách categories",
         "group":"nhóm phân loại dự kiến cho khoản chi này",
         "timeframe":"thời gian dự kiến chi trả (ngay lập tức, tháng này, tháng tới, quý này, năm này, etc.)",
-        "confirmation":"tin nhắn xác nhận đã thực hiện phân tích khả năng chi trả"
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",
       }
 
     ### Yêu cầu tư vấn      
-      {"intent":"coaching", 
-        "request":"yêu cầu coaching của khách hàng"       
+      {
+        "intent":"coaching", 
+        "request":"yêu cầu coaching của khách hàng", 
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",       
       }
     
     ### Yêu cầu khác ngoài danh sách phân loại      
-      {"intent":"others", 
+      {
+        "intent":"others", 
         "reply":"câu trả lời của bạn cho khách hàng",
         "note:"ghi chú của bạn về ý định của khách hàng để có thể hỗ trợ tốt hơn lần sau"
       }.      
@@ -317,6 +321,7 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
   
     # Instructions
     Dựa trên các thông tin về chi tiêu, hướng dẫn dự toán, hãy tiến hành các bước sau
+    - Đầu tiên, xác định ngôn ngữ khách hàng đang dùng để trả lời cho khách hàng. Ví dụ nếu khách hàng hỏi bằng what is the breakdown for fix expense this month?, hãy trả lời bằng tiếng anh.
     - Bước 1: đối chiếu dự toán tháng ${nextMonthText} với chi tiêu tháng ${thisMonthText} từ phần Dữ liệu
     - Bước 2: tra cứu các chỉ dẫn dự toán xem tháng sau có phát sinh giao dịch gì không
     - Bước 3: dựa trên các thông tin trên, đề xuất các thay đổi cho dự toán tháng ${nextMonthText}  
@@ -398,8 +403,9 @@ function generateClassifyTransactionPrompt(subject, body) {
   Dựa vào các thông tin dưới đây hãy tiến hành phân loại giao dịch.
   - Bước 1: tìm kiếm trong Hòan cảnh và Chỉ dẫn phân loại
   - Bước 2: phân loại giao dịch, 
-      - nếu trong tiêu đề email có chữ débitrice, mouvement carte bancaire thì đây là giao dịch chi
-      - nếu trong tiêu đề email có chữ créditrice, thì đây là giao dịch thu
+      - nếu trong tiêu đề email có chữ débitrice, mouvement carte bancaire thì đây là giao dịch chi tiền
+      - nếu trong tiêu đề email có chữ créditrice, thì đây là giao dịch thu tiền
+      - nếu trong nội dung email có chữ "virement Thuy Van" hay "Quang" thì đây là chuyển khoản nội bộ
   - Bước 3: trả lời cho khách hàng theo cấu trúc sau và tuần thủ yêu cầu trình bày
 
   ## Định dạng phản hồi
@@ -484,14 +490,14 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
       Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.  
-      You can only make mistake once. Carefully analyse the customer instruction and update your knowledge base to make sure you catetorise the transaction correctly.
+      You can only make mistake once. Carefully analyse the customer instruction and update your knowledge base to make sure you catetorise the transaction correctly without the need for further instructions from the customer.
       `,    
     userMessage: mainPrompt
   };
 }
 
 //prompt phân tích khả năng chi trả
-function generateAffordabilityAnalysisPrompt(item, amount, category, group, timeframe) {
+function generateAffordabilityAnalysisPrompt(replyText, item, amount, category, group, timeframe) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
   const currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
   const nextMonth = Utilities.formatDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1), Session.getScriptTimeZone(), "MM/yyyy");
@@ -512,9 +518,13 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
 
   let affordabilityPrompt = `
   # Identity
-    Bạn là chuyên gia cố vấn có kinh nghiệ và coach tài chính cá nhân. 
+    Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân. 
+    You are a personal finance assistant chatbot named Penny, communicating with users via Telegram.
+    Be frank, and firm. 
+    Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.
   
   # Instructions
+  ## Ngôn ngữ: Xác định ngôn ngữ của khách hàng. Ví dụ nếu khách hàng hỏi bằng what is the breakdown for fix expense this month?, hãy trả lời bằng English
   ## Bước
   Dựa vào các thông tin dưới đây hãy tiến hành kiểm tra khả năng chi trả cho khoản chi tiêu mới.
   - Bước 1: kiểm tra chi tiêu tháng hiện tại
@@ -532,6 +542,9 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
             _italic text_
             [inline URL](http://www.example.com/)
             [inline mention of a user](tg://user?id=123456789)
+
+  ##Tin nhắn từ khách hàng: 
+  "${replyText}"
 
   # Dữ liệu
   ${familyContext}
@@ -551,9 +564,9 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
   - Món đồ/Chi phí: ${item}
   - Số tiền: ${amount}
   - Phân loại dự kiến: ${category} (${group})
-  - Thời gian dự kiến: ${timeframe}
+  - Thời gian dự kiến: ${timeframe}  
 
-  📝 **Yêu cầu phân tích:**
+  📝 *Yêu cầu phân tích*
   Dựa trên tất cả thông tin tài chính trên, hãy phân tích khả năng chi trả cho khoản chi tiêu này và đưa ra lời khuyên cụ thể.
 
   **Cấu trúc phản hồi:**
@@ -595,8 +608,8 @@ function generateAffordabilityAnalysisPrompt(item, amount, category, group, time
     systemMessage: `The current time is ${currentTime}
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram.
-      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-      Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.`,
+      Be frank and firm. 
+      Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.      `,
     userMessage: affordabilityPrompt
   };
 }
@@ -637,14 +650,20 @@ function generateFinancialCoachingPrompt(userQuestion) {
   const formattedFundBalances = formatFundBalances(fundBalances);
 
   let coachingPrompt = `
-  🎯 **Yêu cầu coaching từ khách hàng:**
+  # Identity
+   Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân. 
+   You are a personal finance assistant chatbot named Penny, communicating with users via Telegram.
+   Be positive, but frank, and firm. 
+   Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.
+
+  #🎯Yêu cầu coaching từ khách hàng
   "${userQuestion}"
 
-  📝 **Yêu cầu coaching:**
-  Dựa trên tất cả thông tin tài chính trên và câu hỏi của khách hàng, hãy đưa ra lời khuyên coaching tài chính cá nhân chuyên nghiệp và thực tế.
+  #📝Yêu cầu coaching
+  Dựa trên tất cả thông tin tài chính trên và câu hỏi của khách hàng, hãy đưa ra lời khuyên coaching tài chính cá nhân chuyên nghiệp và thực tế. 
 
   **Yêu cầu trình bày:**
-  - Ngôn ngữ: Tiếng Việt, thân thiện như một chuyên gia tài chính cá nhân
+  - Ngôn ngữ: xác định ngôn ngữ của khách hàng và trả lời cùng ngôn ngữ đó, thân thiện như một chuyên gia tài chính cá nhân
   - Giới hạn 400 từ
   - Sử dụng emoji phù hợp để làm nổi bật
   - Đưa ra con số cụ thể và tính toán rõ ràng từ dữ liệu thực tế
@@ -657,27 +676,27 @@ function generateFinancialCoachingPrompt(userQuestion) {
   🎯 **Phân tích tình hình tài chính**
   _Ngày phân tích: ${currentTime}_
 
-  **📊 Đánh giá tổng quan:**
+  *📊Đánh giá tổng quan*
   - Phân tích xu hướng thu chi 3 tháng gần nhất
   - Đánh giá hiệu quả thực hiện dự toán
   - Tình hình quỹ và khả năng tài chính hiện tại
 
-  **🎯 Trả lời câu hỏi cụ thể:**
+  *🚦Trả lời câu hỏi cụ thể*
   - Giải đáp trực tiếp yêu cầu của khách hàng
   - Đưa ra lời khuyên cụ thể dựa trên dữ liệu thực tế
   - Phân tích ưu nhược điểm của tình hình hiện tại
 
-  **💡 Khuyến nghị hành động:**
+  *💡Khuyến nghị hành động*
   - Các bước cụ thể khách hàng nên thực hiện
   - Điều chỉnh ngân sách và chi tiêu (nếu cần)
   - Chiến lược quản lý quỹ và tiết kiệm
 
-  **⚠️ Cảnh báo và lưu ý:**
+  *⚠️Cảnh báo và lưu ý*
   - Những rủi ro tài chính cần chú ý
   - Các thói quen chi tiêu cần cải thiện
   - Mục tiêu tài chính cần điều chỉnh
 
-  **🎯 Kế hoạch dài hạn:**
+  *🎯Kế hoạch dài hạn*
   - Đề xuất mục tiêu tài chính 3-6 tháng tới
   - Chiến lược tích lũy và đầu tư
   - Kế hoạch cải thiện tình hình tài chính
