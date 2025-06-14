@@ -437,7 +437,7 @@ function generateClassifyTransactionPrompt(subject, body) {
   };
 }
 
-//prompt xác định ngữ cảnh mới để cải thiện nhận diện
+//prompt xác định hoàn cảnh mới để cải thiện nhận diện
 function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
 
@@ -450,13 +450,18 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
   const categories = getTxCat();
 
   let mainPrompt = `  
+  # Identity  
+  Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
+  Nhiệm vụ của bạn là 
+  - phân loại các giao dịch, thay đổi theo yêu cầu khách hàng và cải thiện chế độ phân loại
+  - đề xuất dự toán hàng tháng, thay đổi số tiền trong dự toán theo yêu cầu của khách hàng
 
   ##Chỉ dẫn
   - Bước 1: so sánh giữa tin nhắn giao dịch gốc và tinh phản hồi của khách hàng trong phần trao đổi
-  - Bước 2: tìm kiếm trong Hàn cảnh và Chỉ dẫn phân loại
+  - Bước 2: tìm kiếm trong Hòan cảnh và Chỉ dẫn phân loại
   - Bước 3: so sánh trong các mục và nhóm phân loại
   - Bước 4: suy ra thông tin hướng dẫn phân loại hoặc hoàn cảnh mới
-      - Nếu đã tồn tại instructionGroup, instructionName, instructionContent có giá trị tương tự trong phần Hướng dẫn, trả về JSON với giá trị "" cho tất cả các khóa.
+      - Nếu đã tồn tại chỉ dẫn có giá trị tương đồng trong phần Chỉ dẫn phân loại, trả về JSON với giá trị "" cho tất cả các khóa.
       - Nếu chưa tồn tại chỉ dẫn, ghi lại điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn mà không cần hướng dẫn của người dùng và trả lại JSON theo cấu trúc sau, không có dấu code block
       {
         "instructionGroup": có 1 trong 3 giá trị:

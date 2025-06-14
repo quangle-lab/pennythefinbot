@@ -32,19 +32,21 @@ function checkTelegramMessages() {
     // Lấy context (nội dung gốc nếu có)
     const originalText = isReplyToBot ? msg.reply_to_message.text : "";
 
-    // Dùng OpenAI để phân tích danh sách ý định     
-    const interpretation = detectUserIntentWithOpenAI (originalText, replyText);
-    sendLog (interpretation);    
+    // Step 1: Detect user intent using OpenAI
+    const interpretation = detectUserIntentWithOpenAI(originalText, replyText);
+    sendLog(interpretation);
 
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    if (!interpretation || !interpretation.intents) {
+      sendTelegramMessage("😅 Xin lỗi, tôi không hiểu yêu cầu của bạn. Bạn có thể nói rõ hơn không?");
+      continue;
+    }
+
     const intents = interpretation.intents || [];
-
-    let allConfirmed = true;
-    let confirmationLines = [];
-    let confirmation = "";
-
+    let allMessages = [];
+    let allLogs = [];
     let hasError = false;
 
+    // Step 2: Process each intent through actionHandler
     intents.forEach((intentObj, index) => {
       if (hasError) return;
 
@@ -52,209 +54,46 @@ function checkTelegramMessages() {
 
       if (!intent || intent === "unknown") {
         hasError = true;
-        allConfirmed = false;
-        confirmation = `🤖 Không xác định được ý định số ${index + 1}. Bạn có thể xác nhận lại toàn bộ yêu cầu không?`;
+        const errorMessage = `🤖 Không xác định được ý định số ${index + 1}. Bạn có thể xác nhận lại toàn bộ yêu cầu không?`;
+        allMessages.push(errorMessage);
         return;
       }
 
       try {
-        switch (intent) {
-          case "modifyTx": {
-            const { tab, newtab, row } = intentObj;
-            const sheet = ss.getSheetByName(tab);
-            if (!sheet) throw `❌ Không tìm thấy sheet "${tab}".`;
+        // Step 3: Call action handler for each intent
+        const actionResult = handleIntent(intentObj, originalText, replyText);
 
-            const current = {
-              date: sheet.getRange(row, 1).getValue(),
-              desc: sheet.getRange(row, 2).getValue(),
-              amount: sheet.getRange(row, 3).getValue(),
-              location: sheet.getRange(row, 4).getValue(),
-              category: sheet.getRange(row, 5).getValue(),
-              comment: sheet.getRange(row, 6).getValue(),
-            };
-
-            if (!newtab) {
-              sheet.getRange(row, 1).setValue(intentObj.date || current.date);
-              sheet.getRange(row, 2).setValue(intentObj.desc || current.desc);
-              sheet.getRange(row, 3).setValue(intentObj.amount || current.amount);
-              sheet.getRange(row, 4).setValue(intentObj.location || current.location);
-              sheet.getRange(row, 5).setValue(intentObj.category || current.category);
-              sheet.getRange(row, 6).setValue(intentObj.comment || current.comment);
-            } else {
-              const newSheet = ss.getSheetByName(newtab);
-              newSheet.appendRow([
-                current.date,
-                current.desc,
-                current.amount,
-                current.location,
-                intentObj.category,
-                current.comment,
-              ]);
-              sheet.deleteRow(row);
-            }
-
-            const promptsSettingsTab = ss.getSheetByName(promptsSettings);          
-            const instruction = detectNewContextWithOpenAI(current, originalText, replyText);
-
-            if (
-              instruction.instructionGroup &&
-              instruction.instructionName &&
-              instruction.instructionContent
-            ) {
-              promptsSettingsTab.appendRow([
-                instruction.instructionGroup,
-                instruction.instructionName,
-                instruction.instructionContent,
-              ]);
-              sendLog (instruction);
-            }
-
-            confirmationLines.push(intentObj.confirmation || `✅ Đã cập nhật giao dịch ở tab ${tab}, dòng ${row}`);
-            break;
-          }
-
-          case "deleteTx": {
-            const { tab, row } = intentObj;
-            const sheet = ss.getSheetByName(tab);
-            sheet.deleteRow(row);
-            confirmationLines.push(intentObj.confirmation || `🗑️ Đã xoá giao dịch ở tab ${tab}, dòng ${row}`);
-            break;
-          }
-
-          case "addTx": {
-            const { tab } = intentObj;
-            const sheet = ss.getSheetByName(tab);
-            if (!sheet) throw `❌ Không tìm thấy sheet "${tab}".`;
-
-            const dateTx = intentObj.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
-            const lastRow = sheet.getLastRow();
-
-            sheet.appendRow([
-              dateTx,
-              intentObj.desc,
-              intentObj.amount,
-              intentObj.location,
-              intentObj.category,
-              intentObj.comment,
-              intentObj.suggestion
-            ]);
-
-            const rowID = lastRow + 1;
-            
-            confirmationLines.push(intentObj.confirmation || `✏️ Đã thêm *${intentObj.amount} EUR* cho *${intentObj.desc}* vào ${tab}, dòng ${rowID}`);
-            break;
-          }
-
-          case "getMonthlyReport": {
-            let monthText = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
-            if (intentObj.month && intentObj.year) {
-              monthText = `${intentObj.month}/${intentObj.year}`;
-            }
-            sendTelegramMessage (intentObj.confirmation);
-
-            const dashboardPrompt = generateExpenseAnalyticsPrompt(replyText, monthText, "dashboard");
-            const result = analyseDataWithOpenAI(dashboardPrompt);
-            confirmationLines.push(result);
-            break;
-          }
-
-          case "getFundBalance": {
-            const result = getFundBalances("all");
-            const formattedResult = formatFundBalances(result);
-            confirmationLines.push(intentObj.confirmation || formattedResult);
-            break;
-          }
-
-          case "affordTest": {            
-            const { item, amount, category, group, timeframe } = intentObj;
-            sendTelegramMessage (intentObj.confirmation);
-
-            //gọi hàm check khả năng mua
-            let affordabilityCheck = checkAffordabilityWithOpenAI(replyText, item, amount, category, group, timeframe);
-            confirmationLines.push(affordabilityCheck);
-
-            break;
-          }
-
-          case "coaching": {
-            // Extract user question from the reply field
-            const userQuestion = intentObj.request || replyText;
-            sendTelegramMessage(intentObj.confirmation);
-
-            // Get comprehensive financial coaching advice
-            const coachingAdvice = handleFinancialCoachingWithAI(userQuestion);
-            confirmationLines.push(coachingAdvice);
-
-            break;
-          }
-
-          case "createBudget": {            
-            const { sourceMonth, month } = intentObj;
-            sendTelegramMessage(intentObj.confirmation);
-
-            // Use the new selective budget creation function
-            const creationResult = createBudgetSelectively(month, sourceMonth);
-
-            if (creationResult.error) {
-              // Error occurred
-              confirmationLines.push(creationResult.error);
-            } else {
-              // Show creation summary
-              confirmationLines.push(creationResult.summary);
-
-              // If there are existing budget lines, show them and ask for modification
-              if (creationResult.existingLines && creationResult.existingLines.length > 0) {
-                let existingMessage = "\n📋 **Các dự toán đã tồn tại:**\n\n";
-                creationResult.existingLines.forEach((line, index) => {
-                  existingMessage += `${index + 1}. **${line.group}** / ${line.category} / €${line.amount}\n`;
-                });                
-                confirmationLines.push(existingMessage);
-              }              
-
-              // Generate budget analysis
-              let budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth);
-              let budgetAnlyticsResp = analyseDataWithOpenAI(budgetPrompt);
-              confirmationLines.push(budgetAnlyticsResp);
-            }
-
-            break;
-          }
-
-          case "modifyBudget": {
-            const { month, changes } = intentObj;
-            const lines = [];
-
-            changes.forEach(change => {
-              const category = change.category;
-              const group = change.group;
-              const note = change["ghi chú"];
-              const amount = parseFloat(change.amount.replace(/[€\s]/g, ""));
-              const line = setBudgetChange(month, group, category, amount, note);
-              lines.push(line);
-            });
-
-            sendLog (intentObj.confirmation);
-
-            confirmationLines.push(intentObj.confirmation || lines.join("\n"));
-            break;
-          }
-
-          default: {
-            confirmationLines.push(intentObj.confirmation || intentObj.reply || `🤖 Tôi chưa hiểu rõ yêu cầu "${intent}".`);
-            Logger.log (intentObj.reply);
-            break;
-          }
+        // Collect messages and logs
+        if (actionResult.messages && actionResult.messages.length > 0) {
+          allMessages = allMessages.concat(actionResult.messages);
         }
+
+        if (actionResult.logs && actionResult.logs.length > 0) {
+          allLogs = allLogs.concat(actionResult.logs);
+        }
+
+        // Log any errors
+        if (!actionResult.success) {
+          Logger.log(`Action failed for intent ${intentObj.intent}: ${actionResult.messages.join(', ')}`);
+        }
+
       } catch (err) {
         hasError = true;
-        allConfirmed = false;
-        confirmation = `⚠️ Lỗi khi xử lý intent thứ ${index + 1}: ${err}`;
+        const errorMessage = `⚠️ Lỗi khi xử lý intent thứ ${index + 1}: ${err}`;
+        allMessages.push(errorMessage);
+        Logger.log(`Error processing intent ${intent}: ${err}`);
       }
     });
 
-    // Kết quả cuối cùng    
-    confirmation = confirmationLines.join("\n\n");
-    sendTelegramMessage (confirmation);
+    // Step 4: Send messages and logs
+    if (allMessages.length > 0) {
+      const finalMessage = allMessages.join("\n\n");
+      sendTelegramMessage(finalMessage);
+    }
+
+    if (allLogs.length > 0) {
+      allLogs.forEach(log => sendLog(log));
+    }
   
     // Cập nhật updateId
     props.setProperty("telegram_lastUpdateId", update.update_id.toString());
@@ -330,8 +169,12 @@ function initMonthlyBudget () {
   const nextMonthText = Utilities.formatDate(nextMonth, Session.getScriptTimeZone(), monthFormat);
 
   //tạo budget tháng mới trong Tab dự toán
-  let confirmationNewBudget = createBudgetSelectively (nextMonthText, thisMonthText);
-  sendTelegramMessage (confirmationNewBudget);
+  let creationResult = createBudgetSelectively(nextMonthText, thisMonthText);
+  if (creationResult.summary) {
+    sendTelegramMessage(creationResult.summary);
+  } else if (creationResult.error) {
+    sendTelegramMessage(creationResult.error);
+  }
 
   //phân tích điểm cần cải thiện của dự toán tháng mới và gửi cho người dùng
   let budgetPrompt = generateBudgetAnalyticsPrompt (nextMonthText, thisMonthText);  

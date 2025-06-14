@@ -222,6 +222,7 @@ function handleFinancialCoachingWithAI(userQuestion) {
   }
 }
 
+//--------- CONVERSATION CONTEXT --------------//
 //tạo payload OpenAI với conversation context
 function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true) {
   const payload = {

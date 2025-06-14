@@ -1,6 +1,7 @@
 # 🤖 Penny — Telegram Finance Assistant Bot
 
-**Penny** is a Telegram bot that helps families manage their household finances through a semi-automated system integrated with Google Sheets. It works via email notifications and manual input, using an LLM for smart classification and analysis.
+**Penny** is a Telegram bot that helps families manage their household finances through a semi-automated system integrated with Google Sheets/GMail. It works via email notifications and manual input, using an LLM for smart classification and analysis.
+Penny can also act as a personal finance assistant, providing insights, recommendations, and coaching based on your spending data, budgets habits, goals and instructions.
 
 ---
 
@@ -33,6 +34,7 @@ Interact with Penny directly in your Telegram group chat using natural language.
 * 📊 View overall or detailed spending reports (e.g., fixed, variable, savings, family fund)
 * 📅 Receive weekly reports and monthly budget suggestions
 * 🎯 Check affordability for purchases or short-term goals
+* 🔮 Get coaching and advice on your financial situation
 
 ---
 
@@ -60,7 +62,8 @@ Interact with Penny directly in your Telegram group chat using natural language.
 
 ```text
 .
-├── botHandler.js             # Handles Telegram messages, detects intent, triggers logic
+├── botHandler.js             # Handles Telegram messages, detects intent, triggers logic, sends replies
+├── actionHandler.js          # Executes specific actions based on detected intent
 ├── promptHandler.js          # Generates prompts for intent detection and financial reasoning
 ├── llmHandler.js             # Sends prompts to the LLM and parses responses
 ├── sheetHandler.js           # Reads/writes transaction, budget, and config data from Sheets
