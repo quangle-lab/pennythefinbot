@@ -30,7 +30,7 @@ function handleAddTransaction(intentObj) {
     ]);
 
     const rowID = lastRow + 1;
-    const message = intentObj.confirmation || `✏️ Đã thêm *${intentObj.amount} EUR* cho *${intentObj.desc}* vào ${tab}, dòng ${rowID}`;
+    const message = `✚${intentObj.confirmation}\n _(dòng ${rowID})_`;
 
     return {
       success: true,
@@ -72,6 +72,8 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
       comment: sheet.getRange(row, 6).getValue(),
     };
 
+    let confirmation = `✅ ${intentObj.confirmation}`;
+
     // Update transaction
     if (!newtab) {
       // Update in same sheet
@@ -81,9 +83,12 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
       sheet.getRange(row, 4).setValue(intentObj.location || current.location);
       sheet.getRange(row, 5).setValue(intentObj.category || current.category);
       sheet.getRange(row, 6).setValue(intentObj.comment || current.comment);
+
+      confirmation = `✅ ${intentObj.confirmation}\n_(dòng ${row})_`
     } else {
       // Move to different sheet
       const newSheet = ss.getSheetByName(newtab);
+      const lastRow = newSheet.getLastRow();
       newSheet.appendRow([
         current.date,
         current.desc,
@@ -91,8 +96,11 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
         current.location,
         intentObj.category,
         current.comment,
-      ]);
+      ]);      
+
       sheet.deleteRow(row);
+
+      confirmation = `✅ ${intentObj.confirmation}\n_(dòng ${lastRow})_`
     }
 
     // Detect new context for learning
@@ -114,7 +122,7 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
 
     return {
       success: true,
-      messages: [intentObj.confirmation || `✅ Đã cập nhật giao dịch ở tab ${tab}, dòng ${row}`],
+      messages: confirmation,
       logs: [intentObj.confirmation || `Transaction updated in ${tab}, row ${row}`]
     };
 
@@ -199,6 +207,8 @@ function handleGetMonthlyReport(intentObj, originalText) {
 function handleCreateBudget(intentObj) {
   try {
     const { sourceMonth, month } = intentObj;
+
+    sendTelegramMessage (intentObj.confirmation);
     
     // Use the selective budget creation function
     const creationResult = createBudgetSelectively(month, sourceMonth);
@@ -295,16 +305,18 @@ function handleGetFundBalance(intentObj) {
 }
 
 //xử lý intent affordTest - kiểm tra khả năng chi trả
-function handleAffordTest(intentObj) {
+function handleAffordTest(intentObj, replyText) {
   try {
     const { item, amount, category, group, timeframe } = intentObj;
+
+    sendTelegramMessage (intentObj.confirmation);
     
     // Get affordability analysis
-    const affordabilityCheck = checkAffordabilityWithOpenAI(item, amount, category, group, timeframe);
+    const affordabilityCheck = checkAffordabilityWithOpenAI(replyText, item, amount, category, group, timeframe);
     
     return {
       success: true,
-      messages: [intentObj.confirmation || "🎯 Đang phân tích khả năng chi trả...", affordabilityCheck],
+      messages: [affordabilityCheck],
       logs: [`Affordability check completed for ${item}`]
     };
     
@@ -322,13 +334,15 @@ function handleCoaching(intentObj, replyText) {
   try {
     // Extract user question from the reply field or use replyText
     const userQuestion = intentObj.reply || replyText;
+
+    sendTelegramMessage (intentObj.confirmation);
     
     // Get comprehensive financial coaching advice
     const coachingAdvice = handleFinancialCoachingWithAI(userQuestion);
     
     return {
       success: true,
-      messages: ["🎯 Đang phân tích tình hình tài chính và chuẩn bị lời khuyên coaching cho bạn...", coachingAdvice],
+      messages: [coachingAdvice],
       logs: [`Financial coaching provided for question: ${userQuestion}`]
     };
     
@@ -377,7 +391,7 @@ function handleIntent(intentObj, originalText, replyText) {
         return handleDeleteTransaction(intentObj);
 
       case "getMonthlyReport":
-        return handleGetMonthlyReport(intentObj, originalText);
+        return handleGetMonthlyReport(intentObj, replyText);
 
       case "createBudget":
         return handleCreateBudget(intentObj);
@@ -389,7 +403,7 @@ function handleIntent(intentObj, originalText, replyText) {
         return handleGetFundBalance(intentObj);
 
       case "affordTest":
-        return handleAffordTest(intentObj);
+        return handleAffordTest(intentObj, replyText);
 
       case "coaching":
         return handleCoaching(intentObj, replyText);

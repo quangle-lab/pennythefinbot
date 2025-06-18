@@ -1,6 +1,6 @@
 //xử lý nhận và gửi tin nhắn với Telegram Bot
 
-//kiểm tra và xác định yêu cầu từ tin nhắn reply hoặc có mention bot
+//check the messages from Telegram (tagging the bot or replying to the bot)
 function checkTelegramMessages() {  
   //Telegram bot settings
   const telegramToken = TELEGRAM_TOKEN;
@@ -10,7 +10,7 @@ function checkTelegramMessages() {
   //Prompt settings
   const promptsSettings = props.getProperty("sheet_ContextConfig") || '🤖Tùy chỉnh Prompts';
   
-  //lấy tin nhắn từ Telegram
+  //browse through all the messages
   const lastUpdateId = props.getProperty("telegram_lastUpdateId") || '0';
   const updatesUrl = `https://api.telegram.org/bot${telegramToken}/getUpdates?offset=${parseInt(lastUpdateId) + 1}`;
   const response = UrlFetchApp.fetch(updatesUrl);
@@ -18,6 +18,7 @@ function checkTelegramMessages() {
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
+  //for each message 
   for (const update of updates) {
     if (!update.message) continue;
     const msg = update.message;    
@@ -29,7 +30,7 @@ function checkTelegramMessages() {
     );
     if (!isReplyToBot && !isMentioningBot) continue;
 
-    // Lấy context (nội dung gốc nếu có)
+    // Get the context of the original message
     const originalText = isReplyToBot ? msg.reply_to_message.text : "";
 
     // Step 1: Detect user intent using OpenAI
@@ -95,13 +96,13 @@ function checkTelegramMessages() {
       allLogs.forEach(log => sendLog(log));
     }
   
-    // Cập nhật updateId
+    // Update last processed update ID
     props.setProperty("telegram_lastUpdateId", update.update_id.toString());
 
   }
 }
 
-//gửi tin nhắn Telegram
+//send message to Telegram
 function sendTelegramMessage (message) {
   const props = PropertiesService.getScriptProperties();
   const debugChannel = props.getProperty("telegram_DebugChat") || '-4847069897';
@@ -133,7 +134,7 @@ function sendTelegramMessage (message) {
   return;
 }
 
-//gửi log Telegram
+//send log to Telegram
 function sendLog (message) {
   const props = PropertiesService.getScriptProperties();
   const logChannel = props.getProperty("telegram_logsChat") || '-4826732207';
@@ -150,15 +151,15 @@ function sendLog (message) {
   });  
 }
 
-//gửi tin nhắn báo cáo chi tiêu hàng tuần
+//send weekly report
 function sendWeeklyReport () {
   var monthText = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");  
-  const monthDashboardPrompt = generateExpenseAnalyticsPrompt(monthText, "dashboard");
+  const monthDashboardPrompt = generateExpenseAnalyticsPrompt("This is the automatic weekly report", monthText, "dashboard");
   const message = analyseDataWithOpenAI(monthDashboardPrompt);
   sendTelegramMessage (message);
 }
 
-//tạo dự toán tháng mới và gửi thông báo hàng tháng
+//send monthly budget
 function initMonthlyBudget () {
   const monthFormat = "MM/yyyy";
 

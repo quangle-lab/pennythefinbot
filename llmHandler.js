@@ -1,5 +1,73 @@
 //xử lý các API calls với LLM (v0.3 hỗ trợ OpenAI /responses)
 
+//tạo payload OpenAI với conversation context
+function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true) {
+  const payload = {
+    model: "gpt-4.1",    
+    input: [
+      { role: "system", content: systemMessage },
+      { role: "user", content: userMessage }
+    ],
+    temperature: temperature
+  };
+
+  // Add conversation context if requested
+  if (includeContext) {
+    const context = getConversationContext();
+    if (context.previous_response_id) {
+      payload.previous_response_id = context.previous_response_id;
+    }
+  }
+
+  return payload;
+}
+
+//--------- INTENT DETECTION --------------//
+//xác định ý định trong yêu cầu của người sử dụng
+function detectUserIntentWithOpenAI(originalText, replyText) {
+  const apiKey = OPENAI_TOKEN;
+
+  // Check if we need to reset conversation (new topic detection)
+  resetConversationIfNeeded();
+
+  // Log current conversation context for debugging
+  logConversationContext();
+
+  //build the prompt
+  const promptData = generateIntentDetectionPrompt(originalText, replyText);
+
+  // Create payload with conversation context
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.6, false);
+
+  const options = {
+    method: "POST",
+    contentType: "application/json",
+    headers: {
+      Authorization: `Bearer ${apiKey}`
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
+  Logger.log (response);
+
+  const json = JSON.parse(response.getContentText());
+  const content = json.output[0].content[0].text;
+
+  // Update conversation context
+  updateConversationContext(json.id, 'intent_detection');
+
+  Logger.log (content);
+
+  try {
+    return JSON.parse(content);
+  } catch (e) {
+    return {intent: "unknown"};
+  }
+}
+
+//--------- TRANSACTION CLASSIFICATION --------------//
 //phân loại giao dịch
 function classifyTransactionWithOpenAI(subject, body) {
   const apiKey = OPENAI_TOKEN;
@@ -30,82 +98,6 @@ function classifyTransactionWithOpenAI(subject, body) {
       category: 'Khác',
       note: 'Không phân loại được với AI',
     };
-  }
-}
-
-//phân tích dữ liệu (giao dịch, dự toán)
-function analyseDataWithOpenAI(promptData) {
-  const apiKey = OPENAI_TOKEN;
-
-  // Create payload with conversation context
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
-
-  const options = {
-    method: "POST",
-    contentType: "application/json",
-    headers: {
-      Authorization: `Bearer ${apiKey}`
-    },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
-    const json = JSON.parse(response.getContentText());
-
-    // Update conversation context
-    updateConversationContext(json.id, 'data_analysis');
-
-    Logger.log (json.output[0].content[0].text);
-
-    return json.output[0].content[0].text;
-  } catch (e) {
-    return "😱Không thể phân tích. Đã xảy ra lỗi." + e;
-  }
-}
-
-//xác định ý định trong yêu cầu của người sử dụng
-function detectUserIntentWithOpenAI(originalText, replyText) {
-  const apiKey = OPENAI_TOKEN;
-
-  // Check if we need to reset conversation (new topic detection)
-  resetConversationIfNeeded();
-
-  // Log current conversation context for debugging
-  logConversationContext();
-
-  //build the prompt
-  const promptData = generateIntentDetectionPrompt(originalText, replyText);
-
-  // Create payload with conversation context
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
-
-  const options = {
-    method: "POST",
-    contentType: "application/json",
-    headers: {
-      Authorization: `Bearer ${apiKey}`
-    },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
-  Logger.log (response);
-
-  const json = JSON.parse(response.getContentText());
-  const content = json.output[0].content[0].text;
-
-  // Update conversation context
-  updateConversationContext(json.id, 'intent_detection');
-
-  Logger.log (content);
-
-  try {
-    return JSON.parse(content);
-  } catch (e) {
-    return {intent: "unknown"};
   }
 }
 
@@ -144,14 +136,47 @@ function detectNewContextWithOpenAI(originalTx, originalText, replyText) {
   }
 }
 
+//--------- DATA ANALYSIS --------------//
+//phân tích dữ liệu (giao dịch, dự toán)
+function analyseDataWithOpenAI(promptData) {
+  const apiKey = OPENAI_TOKEN;
+
+  // Create payload with conversation context
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
+
+  const options = {
+    method: "POST",
+    contentType: "application/json",
+    headers: {
+      Authorization: `Bearer ${apiKey}`
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
+    const json = JSON.parse(response.getContentText());
+
+    // Update conversation context
+    updateConversationContext(json.id, 'data_analysis');
+
+    Logger.log (json.output[0].content[0].text);
+
+    return json.output[0].content[0].text;
+  } catch (e) {
+    return "😱Không thể phân tích. Đã xảy ra lỗi." + e;
+  }
+}
+
 //xác định khả năng thực hiện mục tiêu
-function checkAffordabilityWithOpenAI(item, amount, category, group, timeframe) {
+function checkAffordabilityWithOpenAI(replyText, item, amount, category, group, timeframe) {
   const apiKey = OPENAI_TOKEN;
   const props = PropertiesService.getScriptProperties();
   const previous_response_id = props.getProperty('previous_response_id') || '';
 
   // Sử dụng prompt builder từ promptsHandler
-  const promptData = generateAffordabilityAnalysisPrompt(item, amount, category, group, timeframe);
+  const promptData = generateAffordabilityAnalysisPrompt(replyText, item, amount, category, group, timeframe);
 
   const payload = createOpenAIPayload (promptData.userMessage, promptData.systemMessage, 0.5, true)
 
@@ -223,27 +248,6 @@ function handleFinancialCoachingWithAI(userQuestion) {
 }
 
 //--------- CONVERSATION CONTEXT --------------//
-//tạo payload OpenAI với conversation context
-function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true) {
-  const payload = {
-    model: "gpt-4.1",    
-    input: [
-      { role: "system", content: systemMessage },
-      { role: "user", content: userMessage }
-    ],
-    temperature: temperature
-  };
-
-  // Add conversation context if requested
-  if (includeContext) {
-    const context = getConversationContext();
-    if (context.previous_response_id) {
-      payload.previous_response_id = context.previous_response_id;
-    }
-  }
-
-  return payload;
-}
 
 //quản lý conversation context với OpenAI
 function getConversationContext() {
