@@ -169,7 +169,7 @@ function handleDeleteTransaction(intentObj) {
 }
 
 //xử lý intent getMonthlyReport - lấy báo cáo tháng
-function handleGetMonthlyReport(intentObj, originalText) {
+function handleGetMonthlyReport(intentObj, replyText) {
   try {
     const { month, year } = intentObj;
     
@@ -185,7 +185,7 @@ function handleGetMonthlyReport(intentObj, originalText) {
     }
     
     // Generate expense analytics prompt and get AI analysis
-    const expensePrompt = generateExpenseAnalyticsPrompt(originalText, monthToAnalyze, "dashboard");
+    const expensePrompt = generateExpenseAnalyticsPrompt(replyText, monthToAnalyze, "dashboard");
     const expenseAnalysis = analyseDataWithOpenAI(expensePrompt);
     
     return {
