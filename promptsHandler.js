@@ -252,12 +252,19 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng",
         "changes": [
           {
-            "group":"nhóm dự toán". Sử dụng đúng tên nhóm như trong Chỉ dẫn phân loại.
-            "category":"mục trong từng nhóm". Sử dụng đúng tên mục như trong Chỉ dẫn phân loại.
+            "group":"nhóm dự toán". Sử dụng tên nhóm như trong Chỉ dẫn phân loại, bao gồm cả emoji.
+            "category":"mục trong từng nhóm". Sử dụng đúng tên mục như trong Chỉ dẫn phân loại bao gồm cả emoji.
             "amount":"số tiền dự toán, số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
             "ghi chú":"ghi chú của khách hàng về mục dự toán này cho tháng"
           }
         ]
+      }
+    
+    ### Yêu cầu tra cứu dự toán: dự toán cho một tháng cố định
+      {
+        "intent":"getBudget", 
+        "month":"tháng/năm dự toán theo định dạnh MM/yyyy. Nếu khách hàng không nói tháng, mặc định là tháng hiện tại.",
+        "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng"        
       }
 
     ### Yêu cầu kiểm tra khả năng chi trả

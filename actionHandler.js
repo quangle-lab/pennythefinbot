@@ -288,18 +288,53 @@ function handleGetFundBalance(intentObj) {
   try {
     const result = getFundBalances("all");
     const formattedResult = formatFundBalances(result);
-    
+
     return {
       success: true,
       messages: [intentObj.confirmation || formattedResult],
       logs: ["Fund balance retrieved"]
     };
-    
+
   } catch (error) {
     return {
       success: false,
       messages: [`❌ Lỗi khi lấy số dư quỹ: ${error.toString()}`],
       logs: [`Error in handleGetFundBalance: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent getBudget - lấy dự toán của tháng
+function handleGetBudget(intentObj) {
+  try {
+    const { month } = intentObj;
+
+    // If no month specified, use current month
+    const targetMonth = month || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
+
+    // Use the existing getBudgetData function from sheetHandler
+    const budgetData = getBudgetData(targetMonth);
+
+    // Check if budget data was found
+    if (!budgetData || budgetData.includes("Dự toán của tháng") && budgetData.split('\n').length <= 2) {
+      return {
+        success: true,
+        messages: [intentObj.confirmation || `📊 Chưa có dự toán nào cho tháng ${targetMonth}.`],
+        logs: [`No budget entries found for month: ${targetMonth}`]
+      };
+    }
+
+    return {
+      success: true,
+      messages: [budgetData],
+      logs: [`Budget retrieved for month: ${targetMonth}`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi lấy dự toán: ${error.toString()}`],
+      logs: [`Error in handleGetBudget: ${error.toString()}`]
     };
   }
 }
@@ -401,6 +436,9 @@ function handleIntent(intentObj, originalText, replyText) {
 
       case "getFundBalance":
         return handleGetFundBalance(intentObj);
+
+      case "getBudget":
+        return handleGetBudget(intentObj);
 
       case "affordTest":
         return handleAffordTest(intentObj, replyText);
