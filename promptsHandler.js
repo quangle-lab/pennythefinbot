@@ -10,6 +10,8 @@ function generateClassifyTransactionPrompt(subject, body) {
   const catPrompt = getTxCat();
 
   let mainPrompt = `
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
   # Identity  
   Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
   Nhiệm vụ của bạn là 
@@ -72,7 +74,9 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
   const categoriseInstructions = getCategoriseInstructions();
   const categories = getTxCat();
 
-  let mainPrompt = `  
+  let mainPrompt = `
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+    
   # Identity  
   Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
   Nhiệm vụ của bạn là 
@@ -89,6 +93,7 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
   - Bước 2: tìm kiếm trong Hòan cảnh và Chỉ dẫn phân loại
   - Bước 3: so sánh trong các mục và nhóm phân loại
   - Bước 4: suy ra thông tin hướng dẫn phân loại hoặc hoàn cảnh mới
+      - Nếu phản hồi của khách hàng nói rõ: bỏ qua chỉ dẫn, không thêm chỉ dẫn, trả về JSON với giá trị "" cho tất cả các khóa.
       - Nếu đã tồn tại chỉ dẫn có giá trị tương đồng trong phần Chỉ dẫn phân loại, trả về JSON với giá trị "" cho tất cả các khóa.
       - Nếu chưa tồn tại chỉ dẫn, ghi lại điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn mà không cần hướng dẫn của người dùng và trả lại JSON theo cấu trúc sau, không có dấu code block.\
 
@@ -143,6 +148,8 @@ function generateIntentDetectionPrompt (originalText, replyText) {
   
   let intentDetectionPrompt = `  
   # Identity  
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
   Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram.  
   Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.   
   
@@ -298,7 +305,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
 
   return {
    systemMessage: `      
-      The current time is ${currentTime}
+      The current time is ${currentTime}. The date format is dd/MM/yyyy.
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
@@ -321,6 +328,8 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
     case "dashboard": {
       monthDashboardData = getDashboardData (monthText);
       expenseAnalyticsPrompt = `
+        The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
         # Identity
         Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân.     
         Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
@@ -430,7 +439,7 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
   }
   return {         
     systemMessage: `      
-      The current time is ${currentTime}
+      The current time is ${currentTime} (date format is dd/MM/yyyy)
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
@@ -456,6 +465,8 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
   const dashboardData = getDashboardData (thisMonthText);
   
   budgetAnalyticsPrompt = `
+    The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
     # Identity
     Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân.     
     Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
@@ -539,6 +550,8 @@ function generateAffordabilityAnalysisPrompt(replyText, item, amount, category, 
   const formattedFundBalances = formatFundBalances(fundBalances);
 
   let affordabilityPrompt = `
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
   # Identity
     Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân. 
     Your name is Penny, communicating with users via Telegram.
@@ -674,6 +687,8 @@ function generateFinancialCoachingPrompt(userQuestion) {
   const formattedFundBalances = formatFundBalances(fundBalances);
 
   let coachingPrompt = `
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
   # Identity
     Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân. 
     Your name is Penny, communicating with users via Telegram.

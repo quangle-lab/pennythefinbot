@@ -1,9 +1,9 @@
 //xử lý các API calls với LLM (v0.3 hỗ trợ OpenAI /responses)
 
 //tạo payload OpenAI với conversation context
-function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true) {
+function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, includeContext = true, usedModel="gpt-4.1") {
   const payload = {
-    model: "gpt-4.1",    
+    model: usedModel,    
     input: [
       { role: "system", content: systemMessage },
       { role: "user", content: userMessage }
@@ -37,7 +37,7 @@ function detectUserIntentWithOpenAI(originalText, replyText) {
   const promptData = generateIntentDetectionPrompt(originalText, replyText);
 
   // Create payload with conversation context
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.6, false);
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.6, false, "gpt-4.1");
 
   const options = {
     method: "POST",
@@ -76,7 +76,7 @@ function classifyTransactionWithOpenAI(subject, body) {
 
   // Sử dụng prompt builder từ promptsHandler
   const promptData = generateClassifyTransactionPrompt(subject, body);
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false, "gpt-4.1");
 
   const response = UrlFetchApp.fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -110,7 +110,7 @@ function detectNewContextWithOpenAI(originalTx, originalText, replyText) {
   // Sử dụng prompt builder từ promptsHandler
   const promptData = generateDetectNewContextPrompt(originalTx, originalText, replyText);
 
-  const payload = createOpenAIPayload (promptData.userMessage, promptData.systemMessage, 0.5, false)
+  const payload = createOpenAIPayload (promptData.userMessage, promptData.systemMessage, 0.5, false, "gpt-4.1");
 
   const options = {
     method: "POST",
@@ -142,7 +142,7 @@ function analyseDataWithOpenAI(promptData) {
   const apiKey = OPENAI_TOKEN;
 
   // Create payload with conversation context
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false);
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false, "gpt-4o");
 
   const options = {
     method: "POST",
@@ -178,7 +178,7 @@ function checkAffordabilityWithOpenAI(replyText, item, amount, category, group, 
   // Sử dụng prompt builder từ promptsHandler
   const promptData = generateAffordabilityAnalysisPrompt(replyText, item, amount, category, group, timeframe);
 
-  const payload = createOpenAIPayload (promptData.userMessage, promptData.systemMessage, 0.5, true)
+  const payload = createOpenAIPayload (promptData.userMessage, promptData.systemMessage, 0.5, true, "gpt-4o")
 
   const options = {
     method: "POST",
@@ -216,7 +216,7 @@ function handleFinancialCoachingWithAI(userQuestion) {
   const coachingPrompt = generateFinancialCoachingPrompt(userQuestion);
 
   // Create payload with conversation context
-  const payload = createOpenAIPayload(coachingPrompt.systemMessage, coachingPrompt.userMessage, 0.7, false);
+  const payload = createOpenAIPayload(coachingPrompt.systemMessage, coachingPrompt.userMessage, 0.5, false,  "gpt-4o");
 
   const options = {
     method: "POST",
