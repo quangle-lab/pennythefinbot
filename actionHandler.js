@@ -17,7 +17,9 @@ function handleAddTransaction(intentObj) {
     }
 
     const dateTx = intentObj.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
-    const lastRow = sheet.getLastRow();
+
+    // Generate unique transaction ID
+    const transactionId = generateTransactionId();
 
     sheet.appendRow([
       dateTx,
@@ -26,11 +28,10 @@ function handleAddTransaction(intentObj) {
       intentObj.location,
       intentObj.category,
       intentObj.comment,
-      intentObj.suggestion
+      transactionId
     ]);
 
-    const rowID = lastRow + 1;
-    const message = `✚${intentObj.confirmation}\n _(dòng ${rowID})_`;
+    const message = `✚${intentObj.confirmation}\n _(ID: ${transactionId})_`;
 
     return {
       success: true,
@@ -50,57 +51,88 @@ function handleAddTransaction(intentObj) {
 //xử lý intent modifyTx - chỉnh sửa giao dịch
 function handleModifyTransaction(intentObj, originalText, replyText) {
   try {
-    const { tab, newtab, row } = intentObj;
+    const { tab, newtab, transactionId } = intentObj;
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(tab);
 
-    if (!sheet) {
+    if (!transactionId) {
       return {
         success: false,
-        messages: [`❌ Không tìm thấy sheet "${tab}".`],
-        logs: [`Sheet not found: ${tab}`]
+        messages: [`❌ Thiếu ID giao dịch để thực hiện cập nhật.`],
+        logs: [`Missing transaction ID for modification`]
       };
     }
 
-    // Get current transaction data
-    const current = {
-      date: sheet.getRange(row, 1).getValue(),
-      desc: sheet.getRange(row, 2).getValue(),
-      amount: sheet.getRange(row, 3).getValue(),
-      location: sheet.getRange(row, 4).getValue(),
-      category: sheet.getRange(row, 5).getValue(),
-      comment: sheet.getRange(row, 6).getValue(),
-    };
+    // Find the transaction by ID
+    const findResult = findTransactionRowById(tab, transactionId);
 
+    if (!findResult.success) {
+      return {
+        success: false,
+        messages: [findResult.error],
+        logs: [`Transaction not found: ${transactionId}`]
+      };
+    }
+
+    const current = findResult.rowData;
     let confirmation = `✅ ${intentObj.confirmation}`;
 
     // Update transaction
     if (!newtab) {
       // Update in same sheet
-      sheet.getRange(row, 1).setValue(intentObj.date || current.date);
-      sheet.getRange(row, 2).setValue(intentObj.desc || current.desc);
-      sheet.getRange(row, 3).setValue(intentObj.amount || current.amount);
-      sheet.getRange(row, 4).setValue(intentObj.location || current.location);
-      sheet.getRange(row, 5).setValue(intentObj.category || current.category);
-      sheet.getRange(row, 6).setValue(intentObj.comment || current.comment);
+      const updateResult = updateTransactionById(tab, transactionId, {
+        date: intentObj.date || current.date,
+        description: intentObj.desc || current.description,
+        amount: intentObj.amount || current.amount,
+        location: intentObj.location || current.location,
+        category: intentObj.category || current.category,
+        bankComment: intentObj.comment || current.bankComment
+      });
 
-      confirmation = `✅ ${intentObj.confirmation}\n_(dòng ${row})_`
+      if (!updateResult.success) {
+        return {
+          success: false,
+          messages: [updateResult.error],
+          logs: [`Update failed: ${updateResult.error}`]
+        };
+      }
+
+      confirmation = `✅ ${intentObj.confirmation}\n_(ID: ${transactionId})_`
     } else {
       // Move to different sheet
       const newSheet = ss.getSheetByName(newtab);
-      const lastRow = newSheet.getLastRow();
+      if (!newSheet) {
+        return {
+          success: false,
+          messages: [`❌ Không tìm thấy sheet "${newtab}".`],
+          logs: [`Sheet not found: ${newtab}`]
+        };
+      }
+
+      // Generate new ID for the moved transaction
+      const newTransactionId = generateTransactionId();
+
+      // Add to new sheet
       newSheet.appendRow([
         current.date,
-        current.desc,
+        current.description,
         current.amount,
         current.location,
         intentObj.category,
-        current.comment,
-      ]);      
+        current.bankComment,
+        newTransactionId
+      ]);
 
-      sheet.deleteRow(row);
+      // Delete from old sheet
+      const deleteResult = deleteTransactionById(tab, transactionId);
+      if (!deleteResult.success) {
+        return {
+          success: false,
+          messages: [deleteResult.error],
+          logs: [`Delete failed: ${deleteResult.error}`]
+        };
+      }
 
-      confirmation = `✅ ${intentObj.confirmation}\n_(dòng ${lastRow})_`
+      confirmation = `✅ ${intentObj.confirmation}\n_(ID mới: ${newTransactionId})_`
     }
 
     // Detect new context for learning
@@ -123,7 +155,7 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
     return {
       success: true,
       messages: confirmation,
-      logs: [intentObj.confirmation || `Transaction updated in ${tab}, row ${row}`]
+      logs: [intentObj.confirmation || `Transaction updated: ${transactionId}`]
     };
 
   } catch (error) {
@@ -138,20 +170,28 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
 //xử lý intent deleteTx - xóa giao dịch
 function handleDeleteTransaction(intentObj) {
   try {
-    const { tab, row } = intentObj;
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(tab);
+    const { tab, transactionId } = intentObj;
 
-    if (!sheet) {
+    if (!transactionId) {
       return {
         success: false,
-        messages: [`❌ Không tìm thấy sheet "${tab}".`],
-        logs: [`Sheet not found: ${tab}`]
+        messages: [`❌ Thiếu ID giao dịch để thực hiện xóa.`],
+        logs: [`Missing transaction ID for deletion`]
       };
     }
 
-    sheet.deleteRow(row);
-    const message = intentObj.confirmation || `🗑️ Đã xoá giao dịch ở tab ${tab}, dòng ${row}`;
+    // Delete the transaction by ID
+    const deleteResult = deleteTransactionById(tab, transactionId);
+
+    if (!deleteResult.success) {
+      return {
+        success: false,
+        messages: [deleteResult.error],
+        logs: [`Delete failed: ${deleteResult.error}`]
+      };
+    }
+
+    const message = intentObj.confirmation || `🗑️ Đã xoá giao dịch ID: ${transactionId}`;
 
     return {
       success: true,
@@ -390,17 +430,62 @@ function handleCoaching(intentObj, replyText) {
   }
 }
 
+//xử lý intent search - tìm kiếm giao dịch
+function handleSearch(intentObj) {
+  try {
+    const { startDate, endDate, groups, categories, keywords } = intentObj;
+
+    sendTelegramMessage(intentObj.confirmation);
+
+    // Prepare search parameters
+    const searchParams = {
+      startDate: startDate || '',
+      endDate: endDate || '',
+      groups: groups || [],
+      categories: categories || [],
+      keywords: keywords || ''
+    };
+
+    // Perform search
+    const searchResults = searchTx(searchParams);
+
+    if (!searchResults.success) {
+      return {
+        success: false,
+        messages: [`❌ Lỗi khi tìm kiếm: ${searchResults.error || 'Unknown error'}`],
+        logs: [`Search failed: ${searchResults.error || 'Unknown error'}`]
+      };
+    }
+
+    // Format and return results
+    const formattedResults = formatSearchResults(searchResults);
+
+    return {
+      success: true,
+      messages: [formattedResults],
+      logs: [`Search completed: ${searchResults.totalMatches} transactions found`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi tìm kiếm giao dịch: ${error.toString()}`],
+      logs: [`Error in handleSearch: ${error.toString()}`]
+    };
+  }
+}
+
 //xử lý intent others - các intent khác
 function handleOthers(intentObj) {
   try {
     const reply = intentObj.reply || "Xin lỗi, tôi chưa hiểu yêu cầu của bạn. Bạn có thể nói rõ hơn không?";
-    
+
     return {
       success: true,
       messages: [reply],
       logs: [`Other intent handled: ${intentObj.note || 'No note'}`]
     };
-    
+
   } catch (error) {
     return {
       success: false,
@@ -445,6 +530,9 @@ function handleIntent(intentObj, originalText, replyText) {
 
       case "coaching":
         return handleCoaching(intentObj, replyText);
+
+      case "search":
+        return handleSearch(intentObj);
 
       case "others":
       default:

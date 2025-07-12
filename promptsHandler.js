@@ -195,12 +195,17 @@ function generateIntentDetectionPrompt (originalText, replyText) {
           - Ví dụ 2
             - Tin gốc: "Giảm mục Xe hơi xuống 0"            
             - Ý định: cần giảm mục Xe hơi xuống 0 cho tháng tới
-        - getFundBalance: lấy số dư các quỹ.        
+        - getFundBalance: lấy số dư các quỹ.
         - affordTest: kiểm tra khả năng chi trả cho một khoản chi tiêu dựa trên tình hình tài chính hiện tại
         - coaching: hỏi hoặc yêu cầu kế hoạch để hoàn thành mục tiêu chi tiêu
             - Ví dụ
               Hỏi: tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?
               Trả lời: căn cứ vào hoàn cảnh gia đình, bạn có thể tiết kiệm những mục như ăn ngoài, mua sắm, hạn chế thuê bao số như Netflix
+        - search: tìm kiếm giao dịch theo các tiêu chí như khoảng thời gian, nhóm, mục, từ khóa trong miêu tả
+            - Ví dụ
+              Hỏi: tìm tất cả giao dịch ăn uống tháng 11
+              Hỏi: tìm giao dịch có từ "uber" trong tháng này
+              Hỏi: tìm giao dịch từ 01/11 đến 30/11 trong nhóm chi phí biến đổi
         - others: các intent khác, kèm theo ghi chú trong mục note
           Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, kiểm tra khả năng chi trả cho các khoản chi tiêu, và coaching tài chính cá nhân
           
@@ -239,8 +244,8 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "category":"mục phân loại, tuân thủ tuyệt đối tên mục trong chỉ dẫn phân loại,cả chữ lẫn emoji",
         "comment": 1 trong 2 giá trị dưới đây nếu chưa có lời ghi chú, nếu có lời ghi chú rồi thì giữ nguyên không thay đổi
          - rỗng nếu là intent "modifyTx"
-         - "thêm thủ công" nếu khách hàng yêu cầu thêm giao dịch, chỉ áp dụng cho intent "addTx"      
-        "row":"số thứ tự của dòng cần cập nhật",
+         - "thêm thủ công" nếu khách hàng yêu cầu thêm giao dịch, chỉ áp dụng cho intent "addTx"
+        "transactionId":"ID của giao dịch cần cập nhật áp dụng cho intent "modifyTx" và "deleteTx" (không áp dụng cho intent "addTx")",
         "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng, in đậm tên Nhóm và Mục bằng markdown ví dụ *Chi phí biến đổi*, *Chi phí cố định* hay mục như *Mèo*, *Chợ*. Tuân thủ tuyệt đối tên nhóm và mục như trong chỉ dẫn phân loại.
       }
 
@@ -285,19 +290,30 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",
       }
 
-    ### Yêu cầu tư vấn      
+    ### Yêu cầu tư vấn
       {
-        "intent":"coaching", 
-        "request":"yêu cầu coaching của khách hàng", 
-        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",       
+        "intent":"coaching",
+        "request":"yêu cầu coaching của khách hàng",
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",
       }
-    
-    ### Yêu cầu khác ngoài danh sách phân loại      
+
+    ### Yêu cầu tìm kiếm giao dịch
       {
-        "intent":"others", 
+        "intent":"search",
+        "startDate":"ngày bắt đầu tìm kiếm theo định dạng DD/MM/YYYY, để trống nếu không xác định",
+        "endDate":"ngày kết thúc tìm kiếm theo định dạng DD/MM/YYYY, để trống nếu không xác định",
+        "groups":"danh sách tên nhóm cần tìm kiếm, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji. Để trống nếu tìm tất cả nhóm",
+        "categories":"danh sách tên mục cần tìm kiếm trong nhóm. Để trống nếu tìm tất cả mục",
+        "keywords":"từ khóa cần tìm trong miêu tả và ghi chú giao dịch. Để trống nếu không có từ khóa cụ thể",
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu tìm kiếm của khách hàng"
+      }
+
+    ### Yêu cầu khác ngoài danh sách phân loại
+      {
+        "intent":"others",
         "reply":"câu trả lời của bạn cho khách hàng",
         "note:"ghi chú của bạn về ý định của khách hàng để có thể hỗ trợ tốt hơn lần sau"
-      }.      
+      }.
     
   # Hoàn cảnh gia đình khách hàng
       ${familyContext}      

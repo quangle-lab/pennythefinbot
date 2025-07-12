@@ -257,27 +257,6 @@ function getDashboardData (monthText) {
   return monthDashboardData;
 }
 
-//lấy dữ liệu chi tiêu của tháng monthText theo type -- cố định (fix) hoặc biến đổi (var)
-function getExpenseTx (monthText, type) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const dashboard = ss.getSheetByName("🛤️ Dashboard");
-
-  let firstofMonthText = "01/" + monthText
-
-  // 1. Ghi tháng vào ô A1 để các số liệu cập nhật
-  dashboard.getRange("A1").setValue(firstofMonthText);
-
-  // 2. Các named range cần lấy dữ liệu
-  const rangeNames = [
-    "thongke_ThuNhap",
-    "thongke_ChiPhiCoDinh",
-    "thongke_ChiPhiBienDoi",    
-    "thongke_QuyGiaDinh",
-    "thongke_QuyMucDich",
-    "thongke_TietKiem"
-  ];
-}
-
 //kiểm tra giao dịch đã tồn tại và xử lý xác nhận thêm mới
 function checkAndConfirmTransaction(transaction) {
   const { date, amount, description, bankComment, category, group } = transaction;
@@ -339,6 +318,7 @@ function checkAndConfirmTransaction(transaction) {
     const rowLocation = row[3]; // Column D: Location
     const rowCategory = row[4]; // Column E: Category
     const rowBankComment = row[5]; // Column F: Bank Comment
+    const rowId = row[6]; // Column G: ID
 
     // Compare dates
     let rowDateFormatted;
@@ -436,7 +416,10 @@ function addConfirmedTransaction(sheetName, transactionData) {
 
     const { type, date, description, amount, location, category, bankComment } = transactionData;
 
-    // Add the transaction to the sheet
+    // Generate unique transaction ID
+    const transactionId = generateTransactionId();
+
+    // Add the transaction to the sheet with ID in column G
     const lastRow = sheet.getLastRow();
     sheet.appendRow([
       date,
@@ -444,16 +427,18 @@ function addConfirmedTransaction(sheetName, transactionData) {
       amount,
       location,
       category,
-      bankComment
+      bankComment,
+      transactionId
     ]);
 
-    const newRowNumber = lastRow + 1;    
+    const newRowNumber = lastRow + 1;
 
     return {
       success: true,
-      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}, dòng ${newRowNumber}_`,
+      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}, ID: ${transactionId}_`,
       rowNumber: newRowNumber,
-      sheetName: sheetName
+      sheetName: sheetName,
+      transactionId: transactionId
     };
 
   } catch (error) {
@@ -637,6 +622,562 @@ function formatFundBalances(balanceData) {
 
     return message;
   }
+}
+
+//---------------TRANSACTION ID MANAGEMENT-------------------//
+//tạo ID duy nhất cho giao dịch
+function generateTransactionId() {
+  const timestamp = new Date().getTime();
+  const random = Math.floor(Math.random() * 1000);
+  return `TX${timestamp}${random}`;
+}
+
+//tìm dòng giao dịch theo ID
+function findTransactionRowById(sheetName, transactionId) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy sheet "${sheetName}"`
+      };
+    }
+
+    const data = sheet.getDataRange().getValues();
+
+    // Search for the transaction ID in column G (index 6)
+    for (let i = 1; i < data.length; i++) { // Skip header row
+      const row = data[i];
+      const rowId = row[6]; // Column G: ID
+
+      if (rowId === transactionId) {
+        return {
+          success: true,
+          rowNumber: i + 1,
+          rowData: {
+            date: row[0],
+            description: row[1],
+            amount: row[2],
+            location: row[3],
+            category: row[4],
+            bankComment: row[5],
+            id: row[6]
+          }
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: `❌ Không tìm thấy giao dịch với ID: ${transactionId}`
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi tìm giao dịch: ${error.toString()}`
+    };
+  }
+}
+
+//cập nhật giao dịch theo ID
+function updateTransactionById(sheetName, transactionId, updatedData) {
+  try {
+    const findResult = findTransactionRowById(sheetName, transactionId);
+
+    if (!findResult.success) {
+      return findResult;
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    const rowNumber = findResult.rowNumber;
+
+    // Update the row with new data, keeping the same ID
+    const { date, description, amount, location, category, bankComment } = updatedData;
+
+    sheet.getRange(rowNumber, 1, 1, 7).setValues([[
+      date || findResult.rowData.date,
+      description || findResult.rowData.description,
+      amount || findResult.rowData.amount,
+      location || findResult.rowData.location,
+      category || findResult.rowData.category,
+      bankComment || findResult.rowData.bankComment,
+      transactionId // Keep the same ID
+    ]]);
+
+    return {
+      success: true,
+      message: `✅ Đã cập nhật giao dịch ID: ${transactionId}`,
+      rowNumber: rowNumber,
+      transactionId: transactionId
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi cập nhật giao dịch: ${error.toString()}`
+    };
+  }
+}
+
+//xóa giao dịch theo ID
+function deleteTransactionById(sheetName, transactionId) {
+  try {
+    const findResult = findTransactionRowById(sheetName, transactionId);
+
+    if (!findResult.success) {
+      return findResult;
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    const rowNumber = findResult.rowNumber;
+
+    // Delete the row
+    sheet.deleteRow(rowNumber);
+
+    return {
+      success: true,
+      message: `✅ Đã xóa giao dịch ID: ${transactionId}`,
+      deletedTransaction: findResult.rowData
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi xóa giao dịch: ${error.toString()}`
+    };
+  }
+}
+
+//tạo ID cho các giao dịch chưa có ID (migration function)
+function migrateTransactionID(sheetName = null) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Define all transaction group sheets
+    const transactionSheets = [
+      "💰Thu nhập",
+      "🏡Chi phí cố định",
+      "🛒Chi phí biến đổi",
+      "🛟Quỹ gia đình",
+      "✈️Quỹ mục đích",
+      "🫙Tiết kiệm"
+    ];
+
+    // Determine which sheets to process
+    const sheetsToProcess = sheetName ? [sheetName] : transactionSheets;
+
+    let totalProcessed = 0;
+    let totalUpdated = 0;
+    const results = [];
+
+    sheetsToProcess.forEach(currentSheetName => {
+      const sheet = ss.getSheetByName(currentSheetName);
+
+      if (!sheet) {
+        results.push({
+          sheetName: currentSheetName,
+          success: false,
+          error: `❌ Không tìm thấy sheet "${currentSheetName}"`
+        });
+        return;
+      }
+
+      const data = sheet.getDataRange().getValues();
+      let sheetUpdated = 0;
+      let sheetProcessed = 0;
+
+      // Process each row (skip header row)
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        sheetProcessed++;
+
+        // Check if row has data and if ID column (column G, index 6) is empty
+        if (row[0] && row[1] && (!row[6] || row[6].toString().trim() === '')) {
+          // Generate new ID
+          const newId = generateTransactionId();
+
+          // Update the ID column (column G)
+          sheet.getRange(i + 1, 7).setValue(newId);
+          sheetUpdated++;
+
+          Logger.log(`Generated ID for ${currentSheetName} row ${i + 1}: ${newId}`);
+        }
+      }
+
+      totalProcessed += sheetProcessed;
+      totalUpdated += sheetUpdated;
+
+      results.push({
+        sheetName: currentSheetName,
+        success: true,
+        processed: sheetProcessed,
+        updated: sheetUpdated,
+        message: `✅ ${currentSheetName}: ${sheetUpdated}/${sheetProcessed} giao dịch được cập nhật ID`
+      });
+    });
+
+    // Generate summary message
+    let summaryMessage = `🆔 **Tạo ID cho giao dịch hoàn tất**\n`;
+    summaryMessage += `📊 Tổng kết: ${totalUpdated}/${totalProcessed} giao dịch được cập nhật ID\n\n`;
+
+    results.forEach(result => {
+      if (result.success) {
+        summaryMessage += `${result.message}\n`;
+      } else {
+        summaryMessage += `${result.error}\n`;
+      }
+    });
+
+    return {
+      success: true,
+      totalProcessed: totalProcessed,
+      totalUpdated: totalUpdated,
+      results: results,
+      message: summaryMessage
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi tạo ID: ${error.toString()}`
+    };
+  }
+}
+
+//kiểm tra các giao dịch thiếu ID
+function checkMissingTxID(sheetName = null) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Define all transaction group sheets
+    const transactionSheets = [
+      "💰Thu nhập",
+      "🏡Chi phí cố định",
+      "🛒Chi phí biến đổi",
+      "🛟Quỹ gia đình",
+      "✈️Quỹ mục đích",
+      "🫙Tiết kiệm"
+    ];
+
+    // Determine which sheets to check
+    const sheetsToCheck = sheetName ? [sheetName] : transactionSheets;
+
+    let totalTransactions = 0;
+    let totalMissing = 0;
+    const results = [];
+
+    sheetsToCheck.forEach(currentSheetName => {
+      const sheet = ss.getSheetByName(currentSheetName);
+
+      if (!sheet) {
+        results.push({
+          sheetName: currentSheetName,
+          success: false,
+          error: `❌ Không tìm thấy sheet "${currentSheetName}"`
+        });
+        return;
+      }
+
+      const data = sheet.getDataRange().getValues();
+      let sheetTotal = 0;
+      let sheetMissing = 0;
+      const missingRows = [];
+
+      // Check each row (skip header row)
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+
+        // Count rows with transaction data
+        if (row[0] && row[1]) {
+          sheetTotal++;
+
+          // Check if ID column (column G, index 6) is empty
+          if (!row[6] || row[6].toString().trim() === '') {
+            sheetMissing++;
+            missingRows.push({
+              rowNumber: i + 1,
+              date: row[0],
+              description: row[1],
+              amount: row[2]
+            });
+          }
+        }
+      }
+
+      totalTransactions += sheetTotal;
+      totalMissing += sheetMissing;
+
+      results.push({
+        sheetName: currentSheetName,
+        success: true,
+        total: sheetTotal,
+        missing: sheetMissing,
+        missingRows: missingRows,
+        message: `📋 ${currentSheetName}: ${sheetMissing}/${sheetTotal} giao dịch thiếu ID`
+      });
+    });
+
+    // Generate summary message
+    let summaryMessage = `🔍 **Kiểm tra ID giao dịch**\n`;
+    summaryMessage += `📊 Tổng kết: ${totalMissing}/${totalTransactions} giao dịch thiếu ID\n\n`;
+
+    results.forEach(result => {
+      if (result.success) {
+        summaryMessage += `${result.message}\n`;
+        if (result.missing > 0 && result.missingRows.length <= 5) {
+          // Show first few missing transactions as examples
+          result.missingRows.slice(0, 3).forEach(row => {
+            summaryMessage += `  • Dòng ${row.rowNumber}: ${row.date} - ${row.description}\n`;
+          });
+          if (result.missingRows.length > 3) {
+            summaryMessage += `  • ... và ${result.missingRows.length - 3} giao dịch khác\n`;
+          }
+        }
+      } else {
+        summaryMessage += `${result.error}\n`;
+      }
+    });
+
+    return {
+      success: true,
+      totalTransactions: totalTransactions,
+      totalMissing: totalMissing,
+      results: results,
+      message: summaryMessage
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi kiểm tra ID: ${error.toString()}`
+    };
+  }
+}
+
+//---------------SEARCH-------------------//
+//tìm kiếm giao dịch theo các tiêu chí
+function searchTx(searchParams) {
+  const { startDate, endDate, groups, categories, keywords } = searchParams;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const timezone = Session.getScriptTimeZone();
+
+  // Get all available transaction groups (sheet names)
+  const availableGroups = [
+    "💰Thu nhập",
+    "🏡Chi phí cố định",
+    "🛒Chi phí biến đổi",
+    "🛟Quỹ gia đình",
+    "✈️Quỹ mục đích",
+    "🫙Tiết kiệm"
+  ];
+
+  // Determine which groups to search
+  let groupsToSearch = groups && groups.length > 0 ? groups : availableGroups;
+
+  // Parse date filters
+  let startDateObj = null;
+  let endDateObj = null;
+
+  if (startDate) {
+    try {
+      const dateParts = startDate.split('/');
+      if (dateParts.length === 3) {
+        startDateObj = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+      }
+    } catch (e) {
+      Logger.log(`Invalid start date format: ${startDate}`);
+    }
+  }
+
+  if (endDate) {
+    try {
+      const dateParts = endDate.split('/');
+      if (dateParts.length === 3) {
+        endDateObj = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+      }
+    } catch (e) {
+      Logger.log(`Invalid end date format: ${endDate}`);
+    }
+  }
+
+  const searchResults = [];
+  let totalMatches = 0;
+
+  // Search through each group
+  groupsToSearch.forEach(groupName => {
+    const sheet = ss.getSheetByName(groupName);
+    if (!sheet) {
+      Logger.log(`Sheet not found: ${groupName}`);
+      return;
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return; // Skip if no data (only header)
+
+    const groupMatches = [];
+
+    // Search through each transaction (skip header row)
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rowDate = row[0];
+      const rowDesc = row[1] || '';
+      const rowAmount = row[2];
+      const rowLocation = row[3] || '';
+      const rowCategory = row[4] || '';
+      const rowBankComment = row[5] || '';
+      const rowId = row[6] || '';
+
+      // Skip empty rows
+      if (!rowDate || !rowDesc) continue;
+
+      let matches = true;
+
+      // Date range filter
+      if (startDateObj || endDateObj) {
+        try {
+          const transactionDate = new Date(rowDate);
+          if (startDateObj && transactionDate < startDateObj) matches = false;
+          if (endDateObj && transactionDate > endDateObj) matches = false;
+        } catch (e) {
+          matches = false; // Skip rows with invalid dates
+        }
+      }
+
+      // Category filter
+      if (matches && categories && categories.length > 0) {
+        matches = categories.some(cat =>
+          rowCategory.toLowerCase().includes(cat.toLowerCase())
+        );
+      }
+
+      // Keywords filter (search in description and bank comment)
+      if (matches && keywords && keywords.trim() !== '') {
+        const keywordList = keywords.toLowerCase().split(' ').filter(k => k.trim() !== '');
+        matches = keywordList.some(keyword =>
+          rowDesc.toLowerCase().includes(keyword) ||
+          rowBankComment.toLowerCase().includes(keyword)
+        );
+      }
+
+      if (matches) {
+        groupMatches.push({
+          date: rowDate,
+          description: rowDesc,
+          amount: rowAmount,
+          location: rowLocation,
+          category: rowCategory,
+          bankComment: rowBankComment,
+          id: rowId,
+          rowNumber: i + 1
+        });
+        totalMatches++;
+      }
+    }
+
+    if (groupMatches.length > 0) {
+      searchResults.push({
+        groupName: groupName,
+        transactions: groupMatches
+      });
+    }
+  });
+
+  return {
+    success: true,
+    results: searchResults,
+    totalMatches: totalMatches,
+    searchParams: searchParams
+  };
+}
+
+//định dạng kết quả tìm kiếm theo cấu trúc phân cấp
+function formatSearchResults(searchData) {
+  if (!searchData.success || searchData.totalMatches === 0) {
+    return "🔍 Không tìm thấy giao dịch nào phù hợp với tiêu chí tìm kiếm.";
+  }
+
+  const { results, totalMatches, searchParams } = searchData;
+  const timezone = Session.getScriptTimeZone();
+
+  let message = `🔍 **Kết quả tìm kiếm** (${totalMatches} giao dịch)\n`;
+  message += "=" .repeat(40) + "\n\n";
+
+  // Add search criteria summary
+  if (searchParams.startDate || searchParams.endDate) {
+    message += "📅 **Khoảng thời gian**: ";
+    if (searchParams.startDate && searchParams.endDate) {
+      message += `${searchParams.startDate} - ${searchParams.endDate}\n`;
+    } else if (searchParams.startDate) {
+      message += `Từ ${searchParams.startDate}\n`;
+    } else if (searchParams.endDate) {
+      message += `Đến ${searchParams.endDate}\n`;
+    }
+  }
+
+  if (searchParams.groups && searchParams.groups.length > 0) {
+    message += `🏷️ **Nhóm**: ${searchParams.groups.join(', ')}\n`;
+  }
+
+  if (searchParams.categories && searchParams.categories.length > 0) {
+    message += `📂 **Mục**: ${searchParams.categories.join(', ')}\n`;
+  }
+
+  if (searchParams.keywords && searchParams.keywords.trim() !== '') {
+    message += `🔎 **Từ khóa**: "${searchParams.keywords}"\n`;
+  }
+
+  message += "\n" + "=" .repeat(40) + "\n\n";
+
+  // Format results by group > category > date
+  results.forEach(groupResult => {
+    message += `📊 **${groupResult.groupName}**\n`;
+    message += "-" .repeat(30) + "\n";
+
+    // Group transactions by category
+    const categorizedTx = {};
+    groupResult.transactions.forEach(tx => {
+      const category = tx.category || 'Khác';
+      if (!categorizedTx[category]) {
+        categorizedTx[category] = [];
+      }
+      categorizedTx[category].push(tx);
+    });
+
+    // Sort and display by category
+    Object.keys(categorizedTx).sort().forEach(category => {
+      message += `\n📂 *${category}*\n`;
+
+      // Sort transactions by date (newest first)
+      const sortedTx = categorizedTx[category].sort((a, b) => {
+        try {
+          return new Date(b.date) - new Date(a.date);
+        } catch (e) {
+          return 0;
+        }
+      });
+
+      sortedTx.forEach(tx => {
+        try {
+          const formattedDate = Utilities.formatDate(new Date(tx.date), timezone, "dd/MM");
+          const amount = typeof tx.amount === 'number' ? tx.amount.toFixed(2) : tx.amount;
+          message += `  • ${formattedDate}: ${tx.description} - €${amount}\n`;
+        } catch (e) {
+          // Fallback for invalid dates
+          const amount = typeof tx.amount === 'number' ? tx.amount.toFixed(2) : tx.amount;
+          message += `  • ${tx.date}: ${tx.description} - €${amount}\n`;
+        }
+      });
+    });
+
+    message += "\n";
+  });
+
+  return message.trim();
 }
 
 //---------------CONTEXT-------------------//
