@@ -435,7 +435,7 @@ function addConfirmedTransaction(sheetName, transactionData) {
 
     return {
       success: true,
-      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}, ID: ${transactionId}_`,
+      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}_\n_(ID: ${transactionId})_`,
       rowNumber: newRowNumber,
       sheetName: sheetName,
       transactionId: transactionId
@@ -1056,11 +1056,10 @@ function searchTx(searchParams) {
       }
 
       // Keywords filter (search in description and bank comment)
-      if (matches && keywords && keywords.trim() !== '') {
-        const keywordList = keywords.toLowerCase().split(' ').filter(k => k.trim() !== '');
-        matches = keywordList.some(keyword =>
-          rowDesc.toLowerCase().includes(keyword) ||
-          rowBankComment.toLowerCase().includes(keyword)
+      if (matches && keywords && keywords.length > 0) {
+          matches = keywords.some(keyword =>
+            rowDesc.toLowerCase().includes(keyword.toLowerCase()) ||
+            rowBankComment.toLowerCase().includes(keyword.toLowerCase())
         );
       }
 
@@ -1105,38 +1104,38 @@ function formatSearchResults(searchData) {
   const timezone = Session.getScriptTimeZone();
 
   let message = `🔍 **Kết quả tìm kiếm** (${totalMatches} giao dịch)\n`;
-  message += "=" .repeat(40) + "\n\n";
+  message += "=" .repeat(15) + "\n\n";
 
   // Add search criteria summary
   if (searchParams.startDate || searchParams.endDate) {
-    message += "📅 **Khoảng thời gian**: ";
+    message += "📅: ";
     if (searchParams.startDate && searchParams.endDate) {
       message += `${searchParams.startDate} - ${searchParams.endDate}\n`;
     } else if (searchParams.startDate) {
-      message += `Từ ${searchParams.startDate}\n`;
+      message += `${searchParams.startDate}\n`;
     } else if (searchParams.endDate) {
-      message += `Đến ${searchParams.endDate}\n`;
+      message += `-> ${searchParams.endDate}\n`;
     }
   }
 
   if (searchParams.groups && searchParams.groups.length > 0) {
-    message += `🏷️ **Nhóm**: ${searchParams.groups.join(', ')}\n`;
+    message += `${searchParams.groups.join(', ')}\n`;
   }
 
   if (searchParams.categories && searchParams.categories.length > 0) {
-    message += `📂 **Mục**: ${searchParams.categories.join(', ')}\n`;
+    message += `${searchParams.categories.join(', ')}\n`;
   }
 
-  if (searchParams.keywords && searchParams.keywords.trim() !== '') {
-    message += `🔎 **Từ khóa**: "${searchParams.keywords}"\n`;
+  if (searchParams.keywords && searchParams.keywords.length > 0) {
+    message += `🔎 **Từ khóa**: "${searchParams.keywords.join(', ')}"\n`;
   }
 
-  message += "\n" + "=" .repeat(40) + "\n\n";
+  message += "\n" + "=" .repeat(15) + "\n\n";
 
   // Format results by group > category > date
   results.forEach(groupResult => {
-    message += `📊 **${groupResult.groupName}**\n`;
-    message += "-" .repeat(30) + "\n";
+    message += `**${groupResult.groupName}**\n`;
+    message += "-" .repeat(15) + "\n";
 
     // Group transactions by category
     const categorizedTx = {};
@@ -1150,7 +1149,7 @@ function formatSearchResults(searchData) {
 
     // Sort and display by category
     Object.keys(categorizedTx).sort().forEach(category => {
-      message += `\n📂 *${category}*\n`;
+      message += `\n*${category}*\n`;
 
       // Sort transactions by date (newest first)
       const sortedTx = categorizedTx[category].sort((a, b) => {
@@ -1165,7 +1164,7 @@ function formatSearchResults(searchData) {
         try {
           const formattedDate = Utilities.formatDate(new Date(tx.date), timezone, "dd/MM");
           const amount = typeof tx.amount === 'number' ? tx.amount.toFixed(2) : tx.amount;
-          message += `  • ${formattedDate}: ${tx.description} - €${amount}\n`;
+          message += `  • *${formattedDate}*: ${tx.description} - *€${amount}*\n`;
         } catch (e) {
           // Fallback for invalid dates
           const amount = typeof tx.amount === 'number' ? tx.amount.toFixed(2) : tx.amount;
