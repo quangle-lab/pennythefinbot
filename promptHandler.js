@@ -542,7 +542,7 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
 }
 
 //prompt tư vấn tài chính thông qua agent handler
-function generateConsultPrompt(userQuestion, consultType = "general", consultData = {}) {
+function generateConsultPrompt(userQuestion, consultType = "general", intentObj) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
   const systemPrompt = `
