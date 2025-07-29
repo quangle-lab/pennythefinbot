@@ -2,53 +2,14 @@
 
 //--------- ANALYSE DATA AGENT --------------//
 //agent phân tích dữ liệu với khả năng gọi nhiều function liên tiếp
-function analyseDataAgent(userQuestion) {
-  userQuestion = `phân tích toàn bộ lịch sử ăn ngoài của gia đình tôi từ khi có dữ liệu (bao nhiêu lần, trung bình bao nhiêu tiền, ăn ở những nơi nào nhiều nhất) và đưa ra lời khuyên để tiết kiệm`; 
+function consultDataAnalysticsAgent(consultPrompts) {
+  const apiKey = OPENAI_TOKEN;  
 
-  const apiKey = OPENAI_TOKEN;
-  const currentDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  // Step 1: Get prompts
+  const systemPrompt = consultPrompts.systemMessage;
+  const userQuestion = consultPrompts.userMessage;
 
-  // Step 1: Create system prompt
-  const systemPrompt = `
-The current date is ${currentDate}. The date format is dd/MM/yyyy.
-
-# Identity
-You are a personal financial coach talking to your customer via Telegram.
-Your name is Penny, communicating with users via Telegram.
-Be frank and firm.
-
-# Instructions
-Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.
-Use the following language: Vietnamese
-Don't just rely on the tools, plan and think of all the steps to solve the customer question.
-
-Based on the return the set of functions that you need to answer the user's questions with the following structure, use the JSON format.
-Provide the complete list of functions at the first run, unless it's impossible.
-{
-        "functions":
-    ["list of functions to execute, the functions will be executed and the result will be return to you"
-         {"function_name": "name of the function from the list" ,
-         "params": ["list of params for the function"]
-    ],
-    "last_step": "yes/no -- indicate clearly if this is the last step to execute. If this is not the last step, the result will be sent to you to determine the next step."
-}
-`;
-
-  // Step 2: Create initial payload with tools
-  const initialPayload = {
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userQuestion }
-    ],
-    tools: tools.map(tool => ({
-      type: "function",
-      function: tool
-    })),
-    tool_choice: "auto",
-    temperature: 0.5
-  };
-
+  // Step 2: Initialize conversation for /responses endpoint
   let stepCount = 0;
   const maxSteps = 7;
   let conversationHistory = [
@@ -57,42 +18,78 @@ Provide the complete list of functions at the first run, unless it's impossible.
   ];
 
   try {
+    // Initialize conversation context for agent session
+    resetConversationIfNeeded();
+    logConversationContext();
+
     // Step 3: Execute iterative function calling
     while (stepCount < maxSteps) {
       stepCount++;
 
       Logger.log(`Step ${stepCount}: Making OpenAI API call`);
 
-      const response = UrlFetchApp.fetch("https://api.openai.com/v1/chat/completions", {
+      // Create payload for /responses endpoint
+      const payload = {
+        model: "gpt-4.1",
+        input: conversationHistory,
+        temperature: 0.5,
+        tools: tools
+      };
+
+      // Add conversation context for function call continuity
+      const context = getConversationContext();
+      if (context.previous_response_id) {
+        payload.previous_response_id = context.previous_response_id;
+      }
+
+      const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         },
-        payload: JSON.stringify({
-          ...initialPayload,
-          messages: conversationHistory
-        }),
+        payload: JSON.stringify(payload),
         muteHttpExceptions: true
       });
 
       const json = JSON.parse(response.getContentText());
 
-      if (!json.choices || !json.choices[0]) {
+      if (json.error) {
+        Logger.log (json.error.message);
+        throw new Error(`OpenAI API Error: ${json.error.message}`);
+      }
+
+      if (!json.output || !Array.isArray(json.output)) {
         throw new Error("Invalid OpenAI response");
       }
 
-      const assistantMessage = json.choices[0].message;
+      // Update conversation context for next iteration
+      if (json.id) {
+        updateConversationContext(json.id, 'agent_analysis');
+      }
+
+      // Handle different types of outputs
+      let assistantMessage = { role: "assistant", content: "" };
+      let functionCalls = [];
+
+      for (const output of json.output) {
+        if (output.type === "function_call") {
+          functionCalls.push(output);
+        } else if (output.content && output.content[0] && output.content[0].text) {
+          assistantMessage.content = output.content[0].text;
+        }
+      }
+
       conversationHistory.push(assistantMessage);
 
-      // Check if AI wants to call functions
-      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        Logger.log(`Step ${stepCount}: Processing ${assistantMessage.tool_calls.length} tool calls`);
+      // Process function calls if any
+      if (functionCalls.length > 0) {
+        Logger.log(`Step ${stepCount}: Processing ${functionCalls.length} function calls`);
 
         // Execute each function call
-        for (const toolCall of assistantMessage.tool_calls) {
-          const functionName = toolCall.function.name;
-          const functionArgs = JSON.parse(toolCall.function.arguments);
+        for (const functionCall of functionCalls) {
+          const functionName = functionCall.name;
+          const functionArgs = JSON.parse(functionCall.arguments || "{}");
 
           Logger.log(`Executing function: ${functionName} with args:`, functionArgs);
 
@@ -142,9 +139,9 @@ Provide the complete list of functions at the first run, unless it's impossible.
 
           // Add function result to conversation
           conversationHistory.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: JSON.stringify(functionResult)
+            type: "function_call_output",
+            call_id: functionCall.call_id,
+            output: JSON.stringify(functionResult)
           });
         }
 
@@ -152,12 +149,17 @@ Provide the complete list of functions at the first run, unless it's impossible.
         continue;
       }
 
-      // If no tool calls, check if this is the final response
-      if (assistantMessage.content) {
+      // If no function calls and we have content, this is the final response
+      if (assistantMessage.content && assistantMessage.content.trim()) {
         Logger.log(`Step ${stepCount}: Got final response from AI`);
 
         // Step 4: Send response via Telegram
         sendTelegramMessage(assistantMessage.content);
+
+        // Update final conversation context
+        if (json.id) {
+          updateConversationContext(json.id, 'agent_final_response');
+        }
 
         return {
           success: true,

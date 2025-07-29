@@ -379,53 +379,40 @@ function handleGetBudget(intentObj) {
   }
 }
 
-//xử lý intent affordTest - kiểm tra khả năng chi trả
-function handleAffordTest(intentObj, replyText) {
+//xử lý intent consult - tư vấn tài chính thông qua agent handler
+function handleConsult(intentObj, replyText) {
   try {
-    const { item, amount, category, group, timeframe } = intentObj;
+    // Extract user question and consultation type
+    const userQuestion = intentObj.question || replyText;
+    const consultType = intentObj.consultType || "general";
 
-    sendTelegramMessage (intentObj.confirmation);
-    
-    // Get affordability analysis
-    const affordabilityCheck = checkAffordabilityWithOpenAI(replyText, item, amount, category, group, timeframe);
-    
-    return {
-      success: true,
-      messages: [affordabilityCheck],
-      logs: [`Affordability check completed for ${item}`]
-    };
-    
+    sendTelegramMessage(intentObj.confirmation);
+
+    // Prepare the question for the agent based on consultation type
+    consultPrompts = generateConsultPrompt (userQuestion, consultType, intentObj);
+
+    // Use the agent handler for comprehensive analysis
+    const agentResult = consultDataAnalysticsAgent(consultPrompts);
+
+    if (agentResult.success) {
+      return {
+        success: true,
+        messages: [], // Agent already sends message via Telegram
+        logs: [`Financial consultation completed for: ${userQuestion}`]
+      };
+    } else {
+      return {
+        success: false,
+        messages: [`❌ Lỗi khi cung cấp tư vấn: ${agentResult.error}`],
+        logs: [`Error in handleConsult: ${agentResult.error}`]
+      };
+    }
+
   } catch (error) {
     return {
       success: false,
-      messages: [`❌ Lỗi khi kiểm tra khả năng chi trả: ${error.toString()}`],
-      logs: [`Error in handleAffordTest: ${error.toString()}`]
-    };
-  }
-}
-
-//xử lý intent coaching - coaching tài chính
-function handleCoaching(intentObj, replyText) {
-  try {
-    // Extract user question from the reply field or use replyText
-    const userQuestion = intentObj.reply || replyText;
-
-    sendTelegramMessage (intentObj.confirmation);
-    
-    // Get comprehensive financial coaching advice
-    const coachingAdvice = handleFinancialCoachingWithAI(userQuestion);
-    
-    return {
-      success: true,
-      messages: [coachingAdvice],
-      logs: [`Financial coaching provided for question: ${userQuestion}`]
-    };
-    
-  } catch (error) {
-    return {
-      success: false,
-      messages: [`❌ Lỗi khi cung cấp coaching: ${error.toString()}`],
-      logs: [`Error in handleCoaching: ${error.toString()}`]
+      messages: [`❌ Lỗi khi cung cấp tư vấn: ${error.toString()}`],
+      logs: [`Error in handleConsult: ${error.toString()}`]
     };
   }
 }
@@ -525,10 +512,15 @@ function handleIntent(intentObj, originalText, replyText) {
       case "getBudget":
         return handleGetBudget(intentObj);
 
+      case "consult":
+        return handleConsult(intentObj, replyText);
+
       case "affordTest":
+        // DEPRECATED: Use "consult" intent instead
         return handleAffordTest(intentObj, replyText);
 
       case "coaching":
+        // DEPRECATED: Use "consult" intent instead
         return handleCoaching(intentObj, replyText);
 
       case "search":

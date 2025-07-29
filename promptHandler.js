@@ -196,10 +196,11 @@ function generateIntentDetectionPrompt (originalText, replyText) {
             - Tin gốc: "Giảm mục Xe hơi xuống 0"            
             - Ý định: cần giảm mục Xe hơi xuống 0 cho tháng tới
         - getFundBalance: lấy số dư các quỹ.
-        - affordTest: kiểm tra khả năng chi trả cho một khoản chi tiêu dựa trên tình hình tài chính hiện tại
-        - coaching: hỏi hoặc yêu cầu kế hoạch để hoàn thành mục tiêu chi tiêu
-            - Ví dụ
-              Hỏi: tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?
+        - consult: tư vấn tài chính bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân
+            - Kiểm tra khả năng chi trả: phân tích xem có thể mua/chi trả một khoản tiền nào đó không
+              Ví dụ: "Tôi có thể mua chiếc laptop 1000 euro không?"
+            - Coaching tài chính: hỏi lời khuyên về quản lý tài chính, tiết kiệm, đầu tư
+              Ví dụ: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
               Trả lời: căn cứ vào hoàn cảnh gia đình, bạn có thể tiết kiệm những mục như ăn ngoài, mua sắm, hạn chế thuê bao số như Netflix
         - search: tìm kiếm giao dịch theo các tiêu chí như khoảng thời gian, nhóm, mục, từ khóa trong miêu tả
             - Ví dụ
@@ -207,7 +208,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
               Hỏi: tìm giao dịch có từ "uber" trong tháng này
               Hỏi: tìm giao dịch từ 01/11 đến 30/11 trong nhóm chi phí biến đổi
         - others: các intent khác, kèm theo ghi chú trong mục note
-          Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, kiểm tra khả năng chi trả cho các khoản chi tiêu, và coaching tài chính cá nhân
+          Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, tư vấn tài chính (bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân), và tìm kiếm giao dịch
           
   ## Tin nhắn nhiều ý định
   Trong một tin nhắn của khách hàng có thể có nhiều ý định:
@@ -279,21 +280,16 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng"        
       }
 
-    ### Yêu cầu kiểm tra khả năng chi trả
+    ### Yêu cầu tư vấn tài chính (bao gồm kiểm tra khả năng chi trả và coaching)
       {
-        "intent":"affordTest",
-        "item":"tên món đồ hoặc khoản chi tiêu khách hàng muốn mua/chi trả",
-        "amount":"số tiền dự kiến chi theo định dạng €20.00",
-        "category":"mục phân loại dự kiến cho khoản chi này theo danh sách categories",
-        "group":"nhóm phân loại dự kiến cho khoản chi này",
-        "timeframe":"thời gian dự kiến chi trả (ngay lập tức, tháng này, tháng tới, quý này, năm này, etc.)",
-        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",
-      }
-
-    ### Yêu cầu tư vấn
-      {
-        "intent":"coaching",
-        "request":"yêu cầu coaching của khách hàng",
+        "intent":"consult",
+        "consultType":"affordability hoặc coaching hoặc general",
+        "question":"câu hỏi hoặc yêu cầu tư vấn của khách hàng",
+        "item":"(chỉ cho affordability) tên món đồ hoặc khoản chi tiêu khách hàng muốn mua/chi trả",
+        "amount":"(chỉ cho affordability) số tiền dự kiến chi theo định dạng €20.00",
+        "category":"(chỉ cho affordability) mục phân loại dự kiến cho khoản chi này theo danh sách categories",
+        "group":"(chỉ cho affordability) nhóm phân loại dự kiến cho khoản chi này",
+        "timeframe":"(chỉ cho affordability) thời gian dự kiến chi trả (ngay lập tức, tháng này, tháng tới, quý này, năm này, etc.)",
         "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng",
       }
 
@@ -545,240 +541,70 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
     userMessage: budgetAnalyticsPrompt };
 }
 
-//prompt phân tích khả năng chi trả
-function generateAffordabilityAnalysisPrompt(replyText, item, amount, category, group, timeframe) {
+//prompt tư vấn tài chính thông qua agent handler
+function generateConsultPrompt(userQuestion, consultType = "general", consultData = {}) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
-  const currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
-  const nextMonth = Utilities.formatDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1), Session.getScriptTimeZone(), "MM/yyyy");
 
-  // Hoàn canh gia đình và hướng dẫn dự toán
-  const familyContext = getFamilyContext();
-  const budgetInstructions = getBudgetInstructions();
+  const systemPrompt = `
+    The current date is ${currentTime}. The date format is dd/MM/yyyy.
 
-  // Chi tiêu cho tháng này
-  const currentMonthData = getDashboardData(currentMonth);
-
-  //  Dự toán cho tháng sau
-  const nextMonthBudget = getBudgetData(nextMonth);
-
-  // Số dư các quỹ
-  const fundBalances = getFundBalances("all");
-  const formattedFundBalances = formatFundBalances(fundBalances);
-
-  let affordabilityPrompt = `
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
-
-  # Identity
-    Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân. 
+    # Identity
+    You are a personal financial coach talking to your customer via Telegram.
     Your name is Penny, communicating with users via Telegram.
-    Be frank and firm. 
+    Be frank and firm.
+
+    # Instructions
     Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.
-  
-  # Instructions
-  ## Ngôn ngữ sử dụng
-  -Tiếng việt
+    Use the following language: Vietnamese
+    Don't just rely on the tools, plan and think of all the steps to solve the customer question.
 
-  ## Bước
-  Dựa vào các thông tin dưới đây hãy tiến hành kiểm tra khả năng chi trả cho khoản chi tiêu mới.
-  - Bước 1: kiểm tra chi tiêu tháng hiện tại
-  - Bước 2: kiểm tra dự toán cho tháng tới
-  - Bước 3: kiểm tra số dư các quỹ
-  - Bước 4: đưa ra kết luận và lời khuyên cụ thể theo đúng Cấu trúc phản hồi
-  ## Yêu cầu trình bày
-  - Ngôn ngữ: Tiếng Việt, thân thiện và dễ hiểu
-  - Sử dụng emoji phù hợp để làm nổi bật
-  - Đưa ra con số cụ thể và tính toán rõ ràng
-  - Dùng định dạng markdown cho Telegram
-  - Giới hạn trong 250 từ, tập trung vào những điểm quan trọng nhất
-  - Dùng định dạng markdown cho Telegram, không có dấu code block
-            *bold text*
-            _italic text_
-            [inline URL](http://www.example.com/)
-            [inline mention of a user](tg://user?id=123456789)
+    Use the available tools to gather the necessary financial data, then provide your comprehensive analysis in Vietnamese.
+    `;
 
-  # Dữ liệu
-  ## Nội dung trao đổi
-  - Đây là tin nhắn của khách hàng "${replyText}"\n
+  let consultPrompt = `
+    The current date is ${currentTime}. The date format is dd/MM/yyyy.
 
-  ${familyContext}
-
-  ${budgetInstructions}
-
-  ## Tình hình tài chính tháng hiện tại (${currentMonth})
-  ${currentMonthData}
-
-  ## Dự toán tháng tới (${nextMonth})
-  ${nextMonthBudget}
-
-  ## Số dư các quỹ hiện tại
-  ${formattedFundBalances}
-
-  🛒 **Khoản chi tiêu cần phân tích:**
-  - Món đồ/Chi phí: ${item}
-  - Số tiền: ${amount}
-  - Phân loại dự kiến: ${category} (${group})
-  - Thời gian dự kiến: ${timeframe}  
-
-  📝 *Yêu cầu phân tích*
-  Dựa trên tất cả thông tin tài chính trên, hãy phân tích khả năng chi trả cho khoản chi tiêu này và đưa ra lời khuyên cụ thể.
-
-  **Cấu trúc phản hồi:**
-
-  *🔍Phân tích khả năng chi trả cho "${item}" - ${amount}*
-  _Ngày phân tích: ${currentTime}_
-
-  *💡Kết luận:* [CÓ THỂ CHI TRẢ / CẦN CÂN NHẮC / KHÔNG NÊN CHI TRẢ]*
-
-  *📊Phân tích chi tiết:*
-
-  *1. Tình hình ngân sách hiện tại:*
-     - Phân tích mức độ sử dụng ngân sách tháng hiện tại
-     - Đánh giá khả năng dư thừa trong nhóm chi phí tương ứng
-     - So sánh với dự toán tháng tới
-
-  *2. Tác động đến quỹ:*
-     - Đánh giá tác động đến số dư các quỹ
-     - Khuyến nghị quỹ nào nên sử dụng (nếu có)
-     - Tác động đến mục tiêu tài chính dài hạn
-
-  *3. Phương án thực hiện:*
-     - Thời điểm tối ưu để chi trả
-     - Cách thức chi trả (từ quỹ nào, hay điều chỉnh ngân sách)
-     - Các biện pháp bù đắp (nếu cần)
-
-  *⚠️Lưu ý và khuyến nghị:*
-  - Đưa ra lời khuyên cụ thể dựa trên hoàn cảnh gia đình
-  - Đề xuất các phương án thay thế (nếu có)
-  - Cảnh báo về rủi ro tài chính (nếu có)
-
-  *🎯Kế hoạch hành động:*
-  - Các bước cụ thể khách hàng nên thực hiện
-  - Điều chỉnh ngân sách cần thiết
-  - Theo dõi và đánh giá sau khi chi trả
+    # Customer Request
+    "${userQuestion}"
   `;
 
-  return {
-    systemMessage: `The current time is ${currentTime}
-      ## PERSISTENCE
-      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram.
-      Be frank and firm. 
-      Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.      `,
-    userMessage: affordabilityPrompt
-  };
-}
+  // Add specific context based on consultation type  
+  if (consultType === "affordability" && intentObj.item) {
+    // For affordability tests, provide structured context
+    consultPrompt += `
+      Tôi muốn kiểm tra khả năng chi trả cho: ${intentObj.item} với số tiền ${intentObj.amount}.
+      Dự kiến phân loại vào mục ${intentObj.category} (${intentObj.group}) 
+      và chi trả trong thời gian ${intentObj.timeframe}
+      Câu hỏi gốc: ${userQuestion}`;
 
-//prompt coaching tài chính cá nhân
-function generateFinancialCoachingPrompt(userQuestion) {
-  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
-  const currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
-
-  // Calculate last 3 months
-  const now = new Date();
-  const months = [];
-  for (let i = 2; i >= 0; i--) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(Utilities.formatDate(monthDate, Session.getScriptTimeZone(), "MM/yyyy"));
+  } else if (consultType === "coaching") {
+      // For coaching, add context about financial advice
+    consultPrompt = `Tôi cần lời khuyên coaching tài chính: ${userQuestion}`;
   }
 
-  // Get family context and budget instructions
-  const familyContext = getFamilyContext();
-  const budgetInstructions = getBudgetInstructions();
+  consultPrompt += `
+    # Analysis Requirements
+    1. Use the available tools to gather comprehensive financial data
+    2. Analyze the customer's current financial situation
+    3. Provide specific, actionable advice
+    4. Include concrete numbers and calculations
+    5. Consider the family context and budget guidelines
 
-  // Get dashboard data for last 3 months
-  const dashboardData = [];
-  months.forEach(month => {
-    const monthData = getDashboardData(month);
-    dashboardData.push(`📊 **Tháng ${month}:**\n${monthData}\n`);
-  });
-
-  // Get budget data for last 3 months
-  const budgetData = [];
-  months.forEach(month => {
-    const monthBudget = getBudgetData(month);
-    budgetData.push(`💶 **Dự toán tháng ${month}:**\n${monthBudget}\n`);
-  });
-
-  // Get current fund balances
-  const fundBalances = getFundBalances("all");
-  const formattedFundBalances = formatFundBalances(fundBalances);
-
-  let coachingPrompt = `
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
-
-  # Identity
-    Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân. 
-    Your name is Penny, communicating with users via Telegram.
-    Be frank and firm. 
-    Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.
-
-  # Yêu cầu coaching từ khách hàng
-  "${userQuestion}"
-
-  # Instructions
-  Dựa trên tất cả thông tin tài chính trên và câu hỏi của khách hàng, hãy đưa ra lời khuyên coaching tài chính cá nhân chuyên nghiệp và thực tế. 
-
-  ## Yêu cầu trình bày
-  - Ngôn ngữ: xác định ngôn ngữ của khách hàng và trả lời cùng ngôn ngữ đó, thân thiện như một chuyên gia tài chính cá nhân
-  - Giới hạn 400 từ
-  - Sử dụng emoji phù hợp để làm nổi bật
-  - Đưa ra con số cụ thể và tính toán rõ ràng từ dữ liệu thực tế
-  - Dùng định dạng markdown cho Telegram
-  - Tập trung vào lời khuyên thực tế và có thể thực hiện được
-  - Luôn dựa trên dữ liệu cụ thể để đưa ra khuyến nghị
-
-  ## Cấu trúc phản hồi
-
-  *🎯Phân tích tình hình tài chính*
-  _Ngày phân tích: ${currentTime}_
-
-  *📊Đánh giá tổng quan*
-  - Phân tích xu hướng thu chi 3 tháng gần nhất
-  - Đánh giá hiệu quả thực hiện dự toán
-  - Tình hình quỹ và khả năng tài chính hiện tại
-
-  *🚦Trả lời câu hỏi cụ thể*
-  - Giải đáp trực tiếp yêu cầu của khách hàng
-  - Đưa ra lời khuyên cụ thể dựa trên dữ liệu thực tế
-  - Phân tích ưu nhược điểm của tình hình hiện tại
-
-  *💡Khuyến nghị hành động*
-  - Các bước cụ thể khách hàng nên thực hiện
-  - Điều chỉnh ngân sách và chi tiêu (nếu cần)
-  - Chiến lược quản lý quỹ và tiết kiệm
-
-  *⚠️Cảnh báo và lưu ý*
-  - Những rủi ro tài chính cần chú ý
-  - Các thói quen chi tiêu cần cải thiện
-  - Mục tiêu tài chính cần điều chỉnh
-
-  *🎯Kế hoạch dài hạn*
-  - Đề xuất mục tiêu tài chính 3-6 tháng tới
-  - Chiến lược tích lũy và đầu tư
-  - Kế hoạch cải thiện tình hình tài chính
-
-  # Dữ liệu
-  ## Gia đình
-  ${familyContext}
-
-  ## Hướng dẫn dự toán
-  ${budgetInstructions}
-
-  ## Dữ liệu tài chính 3 tháng gần nhất
-  ${dashboardData.join('\n')}
-
-  ## Dự toán 3 tháng gần nhất
-  ${budgetData.join('\n')}
-
-  ## Số dư các quỹ hiện tại
-  ${formattedFundBalances}
+    # Response Format
+    - Use Vietnamese language
+    - Be friendly but professional
+    - Use appropriate emojis
+    - Use Telegram markdown format (no code blocks)
+        *bold text*
+        _italic text_
+        [inline URL](http://www.example.com/)      
+    - Limit to 400 words maximum
+    - Focus on practical, actionable advice
+    - Base recommendations on actual data
   `;
 
   return {
-    systemMessage: `Bạn là một chuyên gia coaching tài chính cá nhân với nhiều năm kinh nghiệm.
-    Nhiệm vụ của bạn là phân tích dữ liệu tài chính chi tiết và đưa ra lời khuyên coaching chuyên nghiệp, thực tế.
-    Bạn luôn dựa trên dữ liệu cụ thể để đưa ra khuyến nghị và giúp khách hàng cải thiện tình hình tài chính.
-    Phong cách của bạn là thân thiện, dễ hiểu nhưng chuyên nghiệp và có trách nhiệm.
-    Mốc thời gian hiện tại là ${currentTime}.`,
-    userMessage: coachingPrompt
+    systemMessage: systemPrompt,
+    userMessage: consultPrompt
   };
 }

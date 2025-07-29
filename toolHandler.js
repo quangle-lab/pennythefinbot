@@ -1,5 +1,6 @@
 tools =[
   {
+    "type": "function",
     "name": "getBudgetData",
     "description": "Retrieve budget data for a specific month",
     "strict": true,
@@ -18,6 +19,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "getDashboardData",
     "description": "Get dashboard spending data for a specific month",
     "strict": true,
@@ -36,6 +38,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "findTransactionRowById",
     "description": "Find a transaction by its unique ID",
     "strict": true,
@@ -59,6 +62,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "getFundBalances",
     "description": "Get fund balances for specific fund types or all funds",
     "strict": true,
@@ -83,6 +87,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "getTxCat",
     "description": "Get list of transaction categories and groups with their descriptions",
     "strict": true,
@@ -94,6 +99,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "getFamilyContext",
     "description": "Get family context information for financial planning",
     "strict": true,
@@ -105,6 +111,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "getCategoriseInstructions",
     "description": "Get categorization instructions for transaction classification",
     "strict": true,
@@ -116,6 +123,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "getBudgetInstructions",
     "description": "Get budget creation and management instructions that contains planned spending for the family",
     "strict": true,
@@ -127,6 +135,7 @@ tools =[
     }
   },
   {
+    "type": "function",
     "name": "searchTransactions",
     "description": "Search for transactions in spreadsheet based on date range, groups, categories, and keywords.",
     "strict": true,

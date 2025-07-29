@@ -31,11 +31,10 @@ Interact with Penny directly in your Telegram group chat using natural language.
 
 * 📬 Get notified of new transactions via bank emails
 * 📝 Add, modify, or delete transactions manually
+* 💰 Create or modify budgets
+* 🔍 Search for transactions based on criteria like date, category, or keywords
 * 📊 View overall or detailed spending reports (e.g., fixed, variable, savings, family fund)
-* 📅 Receive weekly reports and monthly budget suggestions
-* 🎯 Check affordability for purchases or short-term goals
-* 🔮 Get coaching and advice on your financial situation
-
+* 📝 Get financial coaching and advice based on your spending data, budgets habits, goals and instructions
 ---
 
 ## 🔐 Data Privacy
@@ -62,10 +61,14 @@ Interact with Penny directly in your Telegram group chat using natural language.
 
 ```text
 .
-├── botHandler.js             # Handles Telegram messages, detects intent, triggers logic, sends replies
+├── mailHandler.js            # Checks bank emails for new transactions
+├── botHandler.js             # Handles Telegram messages, detects intent, calls actionHandler and sends replies
 ├── actionHandler.js          # Executes specific actions based on detected intent
 ├── promptHandler.js          # Generates prompts for intent detection and financial reasoning
 ├── llmHandler.js             # Sends prompts to the LLM and parses responses
+├── agentHandler.js           # Handles agent conversations with multiple function calls
+├── toolHandler.js            # List of tools available to the agent
 ├── sheetHandler.js           # Reads/writes transaction, budget, and config data from Sheets
 ├── configuration_template.js # Sample config required to run the bot
+├── testHandler.js            # Unit tests for core functionality
 ```
