@@ -433,9 +433,27 @@ function addConfirmedTransaction(sheetName, transactionData) {
 
     const newRowNumber = lastRow + 1;
 
+    // Calculate remaining amount for the category
+    const remainingData = getCategoryRemainingAmount(sheetName, category);
+    let remainingMessage = "";
+    
+    if (remainingData.success) {
+      const remaining = remainingData.remaining;
+      const budget = remainingData.budget;
+      const actual = remainingData.actual;
+      
+      if (budget > 0) {
+        if (remaining >= 0) {
+          remainingMessage = `\n💰Còn lại cho *${category}*: €${remaining.toFixed(2)} (dự toán: €${budget.toFixed(2)}, đã chi: €${actual.toFixed(2)})`;
+        } else {
+          remainingMessage = `\n⚠️Vượt dự toán cho *${category}*: €${Math.abs(remaining).toFixed(2)} (dự toán: €${budget.toFixed(2)}, đã chi: €${actual.toFixed(2)})`;
+        }
+      }
+    }
+
     return {
       success: true,
-      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}_\n_(ID: ${transactionId})_`,
+      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category} (ID: ${transactionId})_\n-----${remainingMessage}`,
       rowNumber: newRowNumber,
       sheetName: sheetName,
       transactionId: transactionId
@@ -450,7 +468,7 @@ function addConfirmedTransaction(sheetName, transactionData) {
 }
 
 
-//---------------FUNDS-------------------//
+//---------------BALANCES MANAGEMENT-------------------//
 //lấy số dư hiện tại của Quỹ -- gia đình (rainy), mục đích (target) hoặc tiết kiệm (saving)
 function getFundBalances(type) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();  
@@ -560,6 +578,70 @@ function getFundBalances(type) {
     return {
       success: false,
       error: `❌ Lỗi khi lấy tất cả số dư quỹ: ${error.toString()}`
+    };
+  }
+}
+
+//tính số tiền còn lại cho một mục cụ thể trong một nhóm
+function getCategoryRemainingAmount(group, category) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Map group names to their corresponding named range
+    const groupToRangeMap = {
+      "💰Thu nhập": "thongke_ThuNhap",
+      "🏡Chi phí cố định": "thongke_ChiPhiCoDinh", 
+      "🛒Chi phí biến đổi": "thongke_ChiPhiBienDoi",
+      "🛟Quỹ gia đình": "thongke_QuyGiaDinh",
+      "🎯Quỹ mục đích": "thongke_QuyMucDich",
+      "🫙Tiết kiệm": "thongke_TietKiem"
+    };    
+
+    const rangeName = groupToRangeMap[group];
+    if (!rangeName) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy nhóm "${group}"`
+      };
+    }
+
+    const range = ss.getRangeByName(rangeName);
+    if (!range) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy named range "${rangeName}"`
+      };
+    }
+
+    const values = range.getValues();
+    let budget = 0;
+    let actual = 0;
+    let remaining = 0;
+
+    // Find the category in the range
+    for (let i = 1; i < values.length; i++) { // Skip header row
+      const row = values[i];
+      if (row[0] === category) { // Category is in first column
+        budget = parseFloat(row[1]) || 0; // Budget is in second column
+        actual = parseFloat(row[2]) || 0; // Actual is in third column
+        remaining = budget - actual;
+        break;
+      }
+    }
+
+    return {
+      success: true,
+      group: group,
+      category: category,
+      budget: Math.round(budget * 100) / 100,
+      actual: Math.round(actual * 100) / 100,
+      remaining: Math.round(remaining * 100) / 100
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi tính số tiền còn lại: ${error.toString()}`
     };
   }
 }

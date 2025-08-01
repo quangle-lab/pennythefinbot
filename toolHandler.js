@@ -184,5 +184,29 @@ tools =[
       ],
       "additionalProperties": false
     }
+  },
+  {
+    "type": "function",
+    "name": "getCategoryRemainingAmount",
+    "description": "Calculate the remaining budget amount for a specific category in a specific group",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "type": "string",
+          "description": "Name of the transaction group (e.g., '🛒 Chi phí biến đổi', '💸 Chi phí cố định')"
+        },
+        "category": {
+          "type": "string",
+          "description": "Name of the category within the group (e.g., 'Chợ', 'Ăn ngoài')"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "group",
+        "category"
+      ]
+    }
   }
 ]

@@ -130,6 +130,9 @@ function consultDataAnalysticsAgent(consultPrompts) {
                   keywords: functionArgs.keywords || []
                 });
                 break;
+              case "getCategoryRemainingAmount":
+                functionResult = getCategoryRemainingAmount(functionArgs.group, functionArgs.category);
+                break;
               default:
                 functionResult = { error: `Unknown function: ${functionName}` };
             }

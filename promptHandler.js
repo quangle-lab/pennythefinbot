@@ -267,7 +267,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
           {
             "group":"nhóm dự toán". Sử dụng tên nhóm như trong Chỉ dẫn phân loại, bao gồm cả emoji.
             "category":"mục trong từng nhóm". Sử dụng đúng tên mục như trong Chỉ dẫn phân loại bao gồm cả emoji.
-            "amount":"số tiền dự toán, số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
+            "amount":"số tiền dự toán theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết), số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
             "ghi chú":"ghi chú của khách hàng về mục dự toán này cho tháng"
           }
         ]

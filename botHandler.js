@@ -8,7 +8,7 @@ function checkTelegramMessages() {
   const props = PropertiesService.getScriptProperties();
 
   //Prompt settings
-  const promptsSettings = props.getProperty("sheet_ContextConfig") || '🤖Tùy chỉnh Prompts';
+  //const promptsSettings = props.getProperty("sheet_ContextConfig") || '🤖Tùy chỉnh Prompts';
   
   //browse through all the messages
   const lastUpdateId = props.getProperty("telegram_lastUpdateId") || '0';
@@ -16,7 +16,7 @@ function checkTelegramMessages() {
   const response = UrlFetchApp.fetch(updatesUrl);
   const updates = JSON.parse(response.getContentText()).result || [];
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  //const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
   //for each message 
   for (const update of updates) {

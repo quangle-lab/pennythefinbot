@@ -4,34 +4,36 @@
 //xử lý intent addTx - thêm giao dịch
 function handleAddTransaction(intentObj) {
   try {
-    const { tab } = intentObj;
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(tab);
+    const { tab } = intentObj.tab;
+    const dateTx = intentObj.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
-    if (!sheet) {
+    // Prepare transaction data for addConfirmedTransaction
+    const transactionData = {
+      type: intentObj.type,
+      date: dateTx,
+      description: intentObj.desc,
+      amount: intentObj.amount,
+      location: intentObj.location,
+      category: intentObj.category,
+      bankComment: intentObj.comment
+    };
+
+    // Use addConfirmedTransaction to handle the sheet operations
+    const result = addConfirmedTransaction(tab, transactionData);
+
+    if (!result.success) {
       return {
         success: false,
-        messages: [`❌ Không tìm thấy sheet "${tab}".`],
-        logs: [`Sheet not found: ${tab}`]
+        messages: [result.error],
+        logs: [`Error in addConfirmedTransaction: ${result.error}`]
       };
     }
 
-    const dateTx = intentObj.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
-
-    // Generate unique transaction ID
-    const transactionId = generateTransactionId();
-
-    sheet.appendRow([
-      dateTx,
-      intentObj.desc,
-      intentObj.amount,
-      intentObj.location,
-      intentObj.category,
-      intentObj.comment,
-      transactionId
-    ]);
-
-    const message = `✚${intentObj.confirmation}\n _(ID: ${transactionId})_`;
+    // Extract the remaining message from the result
+    const remainingMessage = result.message.includes('-----') ? result.message.split('-----')[1] : '';
+    
+    // Format the message to match the original format
+    const message = `${intentObj.confirmation}\n_(ID: ${result.transactionId})_\n-----remainingMessage}`;
 
     return {
       success: true,
