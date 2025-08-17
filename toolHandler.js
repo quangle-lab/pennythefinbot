@@ -125,7 +125,7 @@ tools =[
   {
     "type": "function",
     "name": "getBudgetInstructions",
-    "description": "Get budget creation and management instructions that contains planned spending for the family",
+    "description": "Get budget creation and management instructions to plan spending for the family and budget management tips",
     "strict": true,
     "parameters": {
       "type": "object",
@@ -206,6 +206,66 @@ tools =[
       "required": [
         "group",
         "category"
+      ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "getBankAccountBalances",
+    "description": "Retrieve bank account balance data from the dashboard spreadsheet",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false,
+      "required": []
+    }
+  },
+  {
+    "type": "function",
+    "name": "updateBankAccountBalance",
+    "description": "Update bank account balance for a specific account number",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "accountNumber": {
+          "type": "string",
+          "description": "Bank account number (e.g., 'FR76 XXXX XXXX XXXX XXXX XXXX XXX')"
+        },
+        "balance": {
+          "type": "string",
+          "description": "New account balance in euro format (e.g., '€1,234.56')"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the balance update in DD/MM/YYYY format"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "accountNumber",
+        "balance",
+        "date"
+      ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "formatBankAccountBalances",
+    "description": "Format bank account balance data for display",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "balanceData": {
+          "type": "object",
+          "description": "Bank account balance data object returned by getBankAccountBalances"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "balanceData"
       ]
     }
   }

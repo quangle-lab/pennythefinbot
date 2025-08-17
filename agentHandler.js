@@ -133,6 +133,15 @@ function consultDataAnalysticsAgent(consultPrompts) {
               case "getCategoryRemainingAmount":
                 functionResult = getCategoryRemainingAmount(functionArgs.group, functionArgs.category);
                 break;
+              case "getBankAccountBalances":
+                functionResult = getBankAccountBalances();
+                break;
+              case "updateBankAccountBalance":
+                functionResult = updateBankAccountBalance(functionArgs.accountNumber, functionArgs.balance, functionArgs.date);
+                break;
+              case "formatBankAccountBalances":
+                functionResult = formatBankAccountBalances(functionArgs.balanceData);
+                break;
               default:
                 functionResult = { error: `Unknown function: ${functionName}` };
             }

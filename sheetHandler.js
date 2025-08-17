@@ -444,16 +444,16 @@ function addConfirmedTransaction(sheetName, transactionData) {
       
       if (budget > 0) {
         if (remaining >= 0) {
-          remainingMessage = `\n💰Còn lại cho *${category}*: €${remaining.toFixed(2)} (dự toán: €${budget.toFixed(2)}, đã chi: €${actual.toFixed(2)})`;
+          remainingMessage = `💶 còn: €${remaining.toFixed(2)}`;
         } else {
-          remainingMessage = `\n⚠️Vượt dự toán cho *${category}*: €${Math.abs(remaining).toFixed(2)} (dự toán: €${budget.toFixed(2)}, đã chi: €${actual.toFixed(2)})`;
+          remainingMessage = `⚠️ đã vượt: €${Math.abs(remaining).toFixed(2)}`;
         }
       }
     }
 
     return {
       success: true,
-      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category} (ID: ${transactionId})_\n-----${remainingMessage}`,
+      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}, ${remainingMessage}_\n_(ID: ${transactionId})_`,
       rowNumber: newRowNumber,
       sheetName: sheetName,
       transactionId: transactionId
@@ -703,6 +703,223 @@ function formatFundBalances(balanceData) {
     }
 
     return message;
+  }
+}
+
+//lấy dữ liệu số dư tài khoản ngân hàng từ dashboard
+function getBankAccountBalances() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const props = PropertiesService.getScriptProperties();
+    
+    // Get the named range from sheet settings
+    const rangeName = props.getProperty('bankAccountBalanceRange') || 'sodu_TaiKhoanNganHang';
+    
+    const namedRange = ss.getRangeByName(rangeName);
+    if (!namedRange) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy named range: "${rangeName}"`
+      };
+    }
+
+    const values = namedRange.getValues();
+    const timezone = Session.getScriptTimeZone();
+    
+    // Expected columns: Group Name, Bank Account Balance, Difference, Bank Account Number, Update Date
+    const bankBalances = [];
+    let totalBankBalance = 0;
+    let totalDifference = 0;
+
+    // Skip header row if exists
+    const startRow = values[0][0] && values[0][0].toString().toLowerCase().includes('group') ? 1 : 0;
+
+    for (let i = startRow; i < values.length; i++) {
+      const row = values[i];
+      
+      // Check if row has valid data
+      if (row[0] && row[1] !== null && row[1] !== undefined) {
+        const groupName = row[0];
+        const bankBalance = parseFloat(row[1]) || 0;
+        const difference = parseFloat(row[2]) || 0;
+        const accountNumber = row[3] || '';
+        const updateDate = row[4] || '';      
+
+        bankBalances.push({
+          groupName: groupName,
+          bankBalance: Math.round(bankBalance * 100) / 100,
+          difference: Math.round(difference * 100) / 100,          
+          accountNumber: accountNumber,
+          updateDate: updateDate
+        });
+
+        totalBankBalance += Math.round(bankBalance * 100) / 100;
+        totalDifference += Math.round(difference * 100) / 100;
+      }
+    }
+
+    return {
+      success: true,
+      bankBalances: bankBalances,
+      totalBankBalance: totalBankBalance,
+      totalDifference: totalDifference,
+      rangeName: rangeName,
+      lastUpdated: new Date().toISOString()
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi lấy dữ liệu số dư tài khoản ngân hàng: ${error.toString()}`
+    };
+  }
+}
+
+//định dạng số dư tài khoản ngân hàng để hiển thị
+function formatBankAccountBalances(balanceData) {
+  if (!balanceData.success) {
+    return balanceData.error;
+  }
+
+  let message = "🏦 **Số dư tài khoản ngân hàng**\n";
+  message += "=" .repeat(35) + "\n\n";
+
+  if (balanceData.bankBalances.length === 0) {
+    message += "_Không có dữ liệu số dư tài khoản ngân hàng_\n";
+    return message;
+  }
+
+  // Group display names mapping
+  const groupDisplayNames = {
+    "Chi phí cố định": "🏡Chi phí cố định",
+    "Chi phí biến đổi": "🛒Chi phí biến đổi", 
+    "Quỹ gia đình": "🛟Quỹ gia đình",
+    "Quỹ mục tiêu": "🎯Quỹ mục tiêu",
+    "Tiết kiệm": "🫙Tiết kiệm"
+  };
+
+  balanceData.bankBalances.forEach(account => {
+    const displayName = groupDisplayNames[account.groupName] || account.groupName;
+    
+    message += `**${displayName}**\n`;
+    message += `  💰 Số dư TK: €${account.bankBalance.toFixed(2)}\n`;
+    
+    const diffEmoji = account.difference == 0 ? "✅" : "⚠️";
+    message += `  ${diffEmoji} Chênh lệch: €${account.difference.toFixed(2)}\n`;    
+    
+    if (account.accountNumber) {
+      message += `  🏛️ TK số: ${account.accountNumber}\n`;
+    }
+    
+    if (account.updateDate) {
+      message += `  📅 Cập nhật: ${account.updateDate}\n`;
+    }
+    
+    message += "\n";
+  });
+
+  message += "=" .repeat(35) + "\n";
+  message += `**Tổng số dư TK: €${balanceData.totalBankBalance.toFixed(2)}**\n`;
+  
+  if (balanceData.totalDifference !== 0) {
+    const totalDiffEmoji = balanceData.totalDifference > 0 ? "✅" : "⚠️";
+    message += `${totalDiffEmoji} **Tổng chênh lệch: €${balanceData.totalDifference.toFixed(2)}**\n`;
+  }
+
+  return message;
+}
+
+//cập nhật số dư tài khoản ngân hàng
+function updateBankAccountBalance(accountNumber, newBalance, updateDate) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const props = PropertiesService.getScriptProperties();
+    
+    // Get the named range from sheet settings
+    const rangeName = props.getProperty('bankAccountBalanceRange') || 'sodu_TaiKhoanNganHang';
+    
+    const namedRange = ss.getRangeByName(rangeName);
+    if (!namedRange) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy named range: "${rangeName}"`
+      };
+    }
+
+    const values = namedRange.getValues();
+    const timezone = Session.getScriptTimeZone();
+    
+    // Parse the new balance
+    const balanceAmount = parseFloat(newBalance.replace(/[€,\s]/g, '')) || 0;
+    const formattedBalance = Math.round(balanceAmount * 100) / 100;
+    
+    // Parse the update date
+    let parsedDate;
+    try {
+      const dateParts = updateDate.split('/');
+      if (dateParts.length === 3) {
+        parsedDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+      } else {
+        parsedDate = new Date(updateDate);
+      }
+    } catch (e) {
+      parsedDate = new Date();
+    }
+    
+    const formattedDate = Utilities.formatDate(parsedDate, timezone, "dd/MM/yyyy");
+    
+    // Find the row with matching account number
+    let foundRow = -1;
+    let currentBalance = 0;
+    let groupName = '';
+    
+    // Skip header row if exists
+    const startRow = values[0][0] && values[0][0].toString().toLowerCase().includes('group') ? 1 : 0;
+    
+    for (let i = startRow; i < values.length; i++) {
+      const row = values[i];
+      const rowAccountNumber = row[3] || ''; // Column D: Account Number
+      
+      if (rowAccountNumber && rowAccountNumber.toString().trim() === accountNumber.toString().trim()) {
+        foundRow = i;        
+        groupName = row[0] || ''; // Column A: Group Name
+        currentBalance = row[1] || 0; // Column B: Current Balance  
+        break;
+      }
+    }
+    
+    if (foundRow === -1) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy tài khoản với số: ${accountNumber}`
+      };
+    }        
+    
+    // Update the 2nd and 5th columns of the range
+    // Column 2: Bank Account Balance, Column 5: Update Date
+    sheet = namedRange.getSheet ();
+    sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+1).setValue(formattedBalance); // 2nd column: Balance    
+    sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+4).setValue(formattedDate); // 5th column: Update Date
+
+    // Calculate difference
+    const difference = sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+2).getValue();
+    
+    return {
+      success: true,
+      accountNumber: accountNumber,
+      oldBalance: Math.round(currentBalance * 100) / 100,
+      newBalance: formattedBalance,      
+      difference: difference,
+      groupName: groupName,
+      updateDate: formattedDate,
+      message: `✅ Đã cập nhật số dư tài khoản *${groupName}*(_#${accountNumber}_)\n💰 Từ: €${Math.round(currentBalance * 100) / 100} → €${formattedBalance}\n📊 Chênh lệch với tính toán: €${Math.round(difference * 100) / 100}`
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi cập nhật số dư tài khoản: ${error.toString()}`
+    };
   }
 }
 

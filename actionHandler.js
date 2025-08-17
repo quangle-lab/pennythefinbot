@@ -27,19 +27,13 @@ function handleAddTransaction(intentObj) {
         messages: [result.error],
         logs: [`Error in addConfirmedTransaction: ${result.error}`]
       };
+    } else {    
+      return {
+        success: true,
+        messages: [result.message],
+        logs: [result.message]
+      };
     }
-
-    // Extract the remaining message from the result
-    const remainingMessage = result.message.includes('-----') ? result.message.split('-----')[1] : '';
-    
-    // Format the message to match the original format
-    const message = `${intentObj.confirmation}\n_(ID: ${result.transactionId})_\n-----remainingMessage}`;
-
-    return {
-      success: true,
-      messages: [message],
-      logs: [message]
-    };
 
   } catch (error) {
     return {

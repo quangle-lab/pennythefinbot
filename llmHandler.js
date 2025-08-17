@@ -101,6 +101,45 @@ function classifyTransactionWithOpenAI(subject, body) {
   }
 }
 
+//phân loại cập nhật số dư tài khoản ngân hàng
+function classifyBankBalanceWithOpenAI(subject, body) {
+  const apiKey = OPENAI_TOKEN;
+  const props = PropertiesService.getScriptProperties();
+  const previous_response_id = props.getProperty('previous_response_id') || '';
+
+  // Sử dụng prompt builder từ promptsHandler
+  const promptData = generateBankBalanceClassificationPrompt(subject, body);
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false, "gpt-4.1");
+
+  const response = UrlFetchApp.fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+
+  try {
+    const json = JSON.parse(response.getContentText());
+    const reply = JSON.parse(json.output[0].content[0].text);
+    return reply;
+  } catch (e) {
+    return {
+      intent: 'AddTx',
+      group: '🛒 Chi phí biến đổi',
+      category: 'Khác',
+      type: '💸Chi',
+      date: '',
+      desc: 'Không phân loại được với AI',
+      amount: '€0.00',
+      location: 'N/A',
+      bankcomment: ''
+    };
+  }
+}
+
 //xác định prompt để cải thiện phân loại giao dịch
 function detectNewContextWithOpenAI(originalTx, originalText, replyText) {
   const apiKey = OPENAI_TOKEN;

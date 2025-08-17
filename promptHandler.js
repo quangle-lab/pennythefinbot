@@ -62,6 +62,80 @@ function generateClassifyTransactionPrompt(subject, body) {
   };
 }
 
+//prompt phân loại cập nhật số dư tài khoản ngân hàng từ email
+function generateBankBalanceClassificationPrompt(subject, body) {
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
+
+  //tạo prompt hoàn cảnh và phân loại
+  const familyContext = getFamilyContext();
+  const catInstructions = getCategoriseInstructions();
+  const catPrompt = getTxCat();
+
+  let mainPrompt = `
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
+  # Identity  
+  Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
+  Nhiệm vụ của bạn là phân tích email từ ngân hàng để xác định loại thông báo và xử lý phù hợp.
+
+  # Nội dung email từ ngân hàng của khách hàng
+  - Tiêu đề email: ${subject}
+  - Nội dung email: ${body}
+  
+  # Instruction
+  ## Bước phân tích
+  Dựa vào nội dung email, hãy xác định đây là loại thông báo nào:
+  - Bước 1: Kiểm tra xem email có chứa thông tin về số dư tài khoản không
+      - Tìm các từ khóa: "solde", "balance", "compte", "account", "soldes", "balances"
+      - Tìm số tài khoản: thường có định dạng "Compte n°X0371 XXXXXX509 01", các sô cuối 
+      - Tìm số tiền số dư (format: €X,XXX.XX hoặc X XXX,XX €)
+  - Bước 2: Nếu là thông báo số dư tài khoản, trả về intent "UpdateBankBalance"
+  - Bước 3: Nếu là thông báo giao dịch thông thường, trả về intent "AddTx"
+  - Bước 4: Trả về thông tin chi tiết theo cấu trúc JSON
+
+  ## Định dạng phản hồi
+  Trả về kết quả dưới dạng JSON, không có dấu code block, không có lời giải thích:
+
+  ### Nếu là thông báo số dư tài khoản (UpdateBankBalance):
+  {
+    "intent": "UpdateBankBalance",
+    "accountNumber": "số tài khoản ngân hàng, chỉ trả 5 số cuối và bao gồm khoảng trắng, ví dụ 509 01",
+    "balance": "số dư tài khoản theo định dạng €X,XXX.XX",
+    "date": "ngày cập nhật số dư theo định dạng DD/MM/YYYY",
+    "group": "tên nhóm tương ứng với tài khoản (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục tiêu, Tiết kiệm)"
+  }
+
+  ### Nếu là thông báo giao dịch thông thường (AddTx):
+  {
+    "intent": "AddTx",
+    "group": "tên nhóm cần thêm giao dịch đúng như trong danh sách, bao gồm tên và emoji",
+    "category": "mục theo đúng tên mục như mô tả",
+    "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
+    "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
+    "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
+    "amount": "số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
+    "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
+    "bankcomment": "trích chú thích Ngân hàng, chỉ ghi thông tin địa điểm phát sinh giao dịch"
+  }
+
+  # Hoàn cảnh gia đình khách hàng và các chỉ dẫn phân loại/dự toán cần thiết
+  ${familyContext}
+  \n${catInstructions}
+  \n${catPrompt}
+
+  `;
+
+  return {
+    systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.      
+      `,
+    userMessage: mainPrompt
+  };
+}
+
 //prompt xác định hoàn cảnh mới để cải thiện nhận diện
 function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
@@ -298,9 +372,10 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "intent":"search",
         "startDate":"ngày bắt đầu tìm kiếm theo định dạng DD/MM/YYYY, để trống nếu không xác định",
         "endDate":"ngày kết thúc tìm kiếm theo định dạng DD/MM/YYYY, để trống nếu không xác định",
-        "groups":"danh sách tên nhóm cần tìm kiếm, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji. Để trống nếu tìm tất cả nhóm",
-        "categories":"danh sách tên mục cần tìm kiếm trong nhóm. Để trống nếu tìm tất cả mục",
-        "keywords":"từ khóa cần tìm trong miêu tả và ghi chú giao dịch. Để trống nếu không có từ khóa cụ thể",
+        "location":"nơi phát sinh giao dịch. 3 giá trị thường gặp là Rennes, Nantes, N/A",
+        "groups":["danh sách tên nhóm cần tìm kiếm, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji. Để trống nếu tìm tất cả nhóm"],
+        "categories":["danh sách tên mục cần tìm kiếm trong nhóm. Để trống nếu tìm tất cả mục"],
+        "keywords":["danh sách từ khóa cần tìm trong miêu tả và ghi chú giao dịch. Để trống nếu không có từ khóa cụ thể"],
         "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu tìm kiếm của khách hàng"
       }
 
@@ -564,8 +639,7 @@ function generateConsultPrompt(userQuestion, consultType = "general", intentObj)
   let consultPrompt = `
     The current date is ${currentTime}. The date format is dd/MM/yyyy.
 
-    # Customer Request
-    "${userQuestion}"
+    # Customer Request    
   `;
 
   // Add specific context based on consultation type  
@@ -588,7 +662,7 @@ function generateConsultPrompt(userQuestion, consultType = "general", intentObj)
     2. Analyze the customer's current financial situation
     3. Provide specific, actionable advice
     4. Include concrete numbers and calculations
-    5. Consider the family context and budget guidelines
+    5. Always consider the family context and budget guidelines
 
     # Response Format
     - Use Vietnamese language
