@@ -30,6 +30,7 @@ To use the bot, you’ll need:
 Interact with Penny directly in your Telegram group chat using natural language. Supported actions include:
 
 * 📬 Get notified of new transactions via bank emails
+* 🖌️ Keep track of the bank account balances for each expesens via bank emails
 * 📝 Add, modify, or delete transactions manually
 * 💰 Create or modify budgets
 * 🔍 Search for transactions based on criteria like date, category, or keywords
@@ -50,9 +51,9 @@ Interact with Penny directly in your Telegram group chat using natural language.
 
 | Task                                  | Frequency    |
 | ------------------------------------- | ------------ |
-| Check bank email for new transactions | Every hour   |
+| Check bank email for new transactions | Every 10 min |
 | Read Telegram group chat              | Every minute |
-| Send weekly spending summary          | Every Monday |
+| Send weekly spending summary          | Every Sat    |
 | Generate monthly budget suggestion    | Every 27th   |
 
 ---

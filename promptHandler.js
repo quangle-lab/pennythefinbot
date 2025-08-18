@@ -1,6 +1,6 @@
 //tạo các prompts
 
-//prompt phân loại giao dịch từ email
+//prompt phân loại giao dịch từ email -- DEPRECATED
 function generateClassifyTransactionPrompt(subject, body) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
 
@@ -269,12 +269,20 @@ function generateIntentDetectionPrompt (originalText, replyText) {
           - Ví dụ 2
             - Tin gốc: "Giảm mục Xe hơi xuống 0"            
             - Ý định: cần giảm mục Xe hơi xuống 0 cho tháng tới
-        - getFundBalance: lấy số dư các quỹ.
+        - getFundBalance: lấy số dư các quỹ.            
+            - Ví dụ
+              Hỏi: tôi còn bao nhiêu tiền trong quỹ
+              Hỏi: tôi còn bao nhiêu tiền trong tài khoản ngân hàng
+              Hỏi: lấy số dư các quỹ gia đình
+              Hỏi: lấy số dư các quỹ mục đích
+              Hỏi: lấy số dư các quỹ tiết kiệm
         - consult: tư vấn tài chính bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân
             - Kiểm tra khả năng chi trả: phân tích xem có thể mua/chi trả một khoản tiền nào đó không
-              Ví dụ: "Tôi có thể mua chiếc laptop 1000 euro không?"
+              Ví dụ 1: "Tôi có thể mua chiếc laptop 1000 euro không?"
+              Ví dụ 2: "Tôi còn bao nhiêu tiền trong tài khoản ngân hàng tới cuối tháng?"
             - Coaching tài chính: hỏi lời khuyên về quản lý tài chính, tiết kiệm, đầu tư
-              Ví dụ: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
+              Ví dụ 1: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
+              Ví dụ 2: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
               Trả lời: căn cứ vào hoàn cảnh gia đình, bạn có thể tiết kiệm những mục như ăn ngoài, mua sắm, hạn chế thuê bao số như Netflix
         - search: tìm kiếm giao dịch theo các tiêu chí như khoảng thời gian, nhóm, mục, từ khóa trong miêu tả
             - Ví dụ
@@ -354,7 +362,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng"        
       }
 
-    ### Yêu cầu tư vấn tài chính (bao gồm kiểm tra khả năng chi trả và coaching)
+    ### Yêu cầu tư vấn tài chính (bao gồm kiểm tra khả năng chi trả cho chi phí sinh hoạt hoặc mua sắm, tư vấn về tài chính cá nhân và coaching)
       {
         "intent":"consult",
         "consultType":"affordability hoặc coaching hoặc general",

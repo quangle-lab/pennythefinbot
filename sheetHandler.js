@@ -469,13 +469,77 @@ function addConfirmedTransaction(sheetName, transactionData) {
 
 
 //---------------BALANCES MANAGEMENT-------------------//
-//lấy số dư hiện tại của Quỹ -- gia đình (rainy), mục đích (target) hoặc tiết kiệm (saving)
+//tính số tiền còn lại cho một mục cụ thể trong một nhóm
+function getCategoryRemainingAmount(group, category) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Map group names to their corresponding named range
+    const groupToRangeMap = {
+      "💰Thu nhập": "thongke_ThuNhap",
+      "🏡Chi phí cố định": "thongke_ChiPhiCoDinh", 
+      "🛒Chi phí biến đổi": "thongke_ChiPhiBienDoi",
+      "🛟Quỹ gia đình": "thongke_QuyGiaDinh",
+      "🎯Quỹ mục đích": "thongke_QuyMucDich",
+      "🫙Tiết kiệm": "thongke_TietKiem"
+    };    
+
+    const rangeName = groupToRangeMap[group];
+    if (!rangeName) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy nhóm "${group}"`
+      };
+    }
+
+    const range = ss.getRangeByName(rangeName);
+    if (!range) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy named range "${rangeName}"`
+      };
+    }
+
+    const values = range.getValues();
+    let budget = 0;
+    let actual = 0;
+    let remaining = 0;
+
+    // Find the category in the range
+    for (let i = 1; i < values.length; i++) { // Skip header row
+      const row = values[i];
+      if (row[0] === category) { // Category is in first column
+        budget = parseFloat(row[1]) || 0; // Budget is in second column
+        actual = parseFloat(row[2]) || 0; // Actual is in third column
+        remaining = budget - actual;
+        break;
+      }
+    }
+
+    return {
+      success: true,
+      group: group,
+      category: category,
+      budget: Math.round(budget * 100) / 100,
+      actual: Math.round(actual * 100) / 100,
+      remaining: Math.round(remaining * 100) / 100
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi tính số tiền còn lại: ${error.toString()}`
+    };
+  }
+}
+
+//lấy số dư hiện tại của Quỹ -- gia đình (family), mục tiêu (target) hoặc tiết kiệm (saving)
 function getFundBalances(type) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();  
 
   // Map type to named range
   const typeToRangeMap = {
-    "rainy": "sodu_QuyGiaDinh",
+    "family": "sodu_QuyGiaDinh",
     "target": "sodu_QuyMucDich",
     "saving": "sodu_Tietkiem",
     "all": ["sodu_QuyGiaDinh", "sodu_QuyMucDich", "sodu_Tietkiem"]
@@ -582,70 +646,6 @@ function getFundBalances(type) {
   }
 }
 
-//tính số tiền còn lại cho một mục cụ thể trong một nhóm
-function getCategoryRemainingAmount(group, category) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    // Map group names to their corresponding named range
-    const groupToRangeMap = {
-      "💰Thu nhập": "thongke_ThuNhap",
-      "🏡Chi phí cố định": "thongke_ChiPhiCoDinh", 
-      "🛒Chi phí biến đổi": "thongke_ChiPhiBienDoi",
-      "🛟Quỹ gia đình": "thongke_QuyGiaDinh",
-      "🎯Quỹ mục đích": "thongke_QuyMucDich",
-      "🫙Tiết kiệm": "thongke_TietKiem"
-    };    
-
-    const rangeName = groupToRangeMap[group];
-    if (!rangeName) {
-      return {
-        success: false,
-        error: `❌ Không tìm thấy nhóm "${group}"`
-      };
-    }
-
-    const range = ss.getRangeByName(rangeName);
-    if (!range) {
-      return {
-        success: false,
-        error: `❌ Không tìm thấy named range "${rangeName}"`
-      };
-    }
-
-    const values = range.getValues();
-    let budget = 0;
-    let actual = 0;
-    let remaining = 0;
-
-    // Find the category in the range
-    for (let i = 1; i < values.length; i++) { // Skip header row
-      const row = values[i];
-      if (row[0] === category) { // Category is in first column
-        budget = parseFloat(row[1]) || 0; // Budget is in second column
-        actual = parseFloat(row[2]) || 0; // Actual is in third column
-        remaining = budget - actual;
-        break;
-      }
-    }
-
-    return {
-      success: true,
-      group: group,
-      category: category,
-      budget: Math.round(budget * 100) / 100,
-      actual: Math.round(actual * 100) / 100,
-      remaining: Math.round(remaining * 100) / 100
-    };
-
-  } catch (error) {
-    return {
-      success: false,
-      error: `❌ Lỗi khi tính số tiền còn lại: ${error.toString()}`
-    };
-  }
-}
-
 //định dạng số dư quỹ để hiển thị
 function formatFundBalances(balanceData) {
   if (!balanceData.success) {
@@ -653,20 +653,20 @@ function formatFundBalances(balanceData) {
   }
 
   if (balanceData.type === "all") {
-    let message = "💰 **Tổng quan số dư các quỹ**\n";
-    message += "=" .repeat(30) + "\n\n";
+    let message = "💰*Tổng quan số dư các quỹ*\n";
+    message += "-" .repeat(15) + "\n";
 
     const fundNames = {
-      "rainy": "🛟 Quỹ Gia Đình",
-      "target": "🎯 Quỹ Mục Đích",
-      "saving": "💎 Tiết Kiệm"
+      "rainy": "🛟Quỹ Gia Đình",
+      "target": "🎯Quỹ Mục Đích",
+      "saving": "💎Tiết Kiệm"
     };
 
     Object.keys(balanceData.balances).forEach(fundType => {
       const fund = balanceData.balances[fundType];
       const fundName = fundNames[fundType] || fundType;
 
-      message += `**${fundName}**\n`;
+      message += `*${fundName}*\n`;
 
       if (Object.keys(fund.items).length > 0) {
         Object.entries(fund.items).forEach(([name, amount]) => {
@@ -684,14 +684,14 @@ function formatFundBalances(balanceData) {
   } else {
     // Single fund type
     const fundNames = {
-      "rainy": "🛟 Quỹ Gia Đình",
-      "target": "🎯 Quỹ Mục Đích",
-      "saving": "💎 Tiết Kiệm"
+      "rainy": "🛟Quỹ Gia Đình",
+      "target": "🎯Quỹ Mục Đích",
+      "saving": "💎Tiết Kiệm"
     };
 
     const fundName = fundNames[balanceData.type] || balanceData.type;
-    let message = `💰 **${fundName}**\n`;
-    message += "=" .repeat(20) + "\n\n";
+    let message = `💰*${fundName}*\n`;
+    message += "-" .repeat(15) + "\n";
 
     if (Object.keys(balanceData.balances).length > 0) {
       Object.entries(balanceData.balances).forEach(([name, amount]) => {
@@ -750,7 +750,7 @@ function getBankAccountBalances() {
           bankBalance: Math.round(bankBalance * 100) / 100,
           difference: Math.round(difference * 100) / 100,          
           accountNumber: accountNumber,
-          updateDate: updateDate
+          updateDate: Utilities.formatDate(updateDate, timezone, "dd/MM/yyyy")
         });
 
         totalBankBalance += Math.round(bankBalance * 100) / 100;
@@ -781,50 +781,38 @@ function formatBankAccountBalances(balanceData) {
     return balanceData.error;
   }
 
-  let message = "🏦 **Số dư tài khoản ngân hàng**\n";
-  message += "=" .repeat(35) + "\n\n";
+  let message = "🏦*Số dư tài khoản ngân hàng*\n";
+  message += "-" .repeat(15) + "\n";
 
   if (balanceData.bankBalances.length === 0) {
     message += "_Không có dữ liệu số dư tài khoản ngân hàng_\n";
     return message;
   }
 
-  // Group display names mapping
+  // Group display names mapping, exclude "Quỹ mục tiêu" and "Tiết kiệm" as they do not have email notifications
   const groupDisplayNames = {
     "Chi phí cố định": "🏡Chi phí cố định",
     "Chi phí biến đổi": "🛒Chi phí biến đổi", 
     "Quỹ gia đình": "🛟Quỹ gia đình",
-    "Quỹ mục tiêu": "🎯Quỹ mục tiêu",
-    "Tiết kiệm": "🫙Tiết kiệm"
   };
 
   balanceData.bankBalances.forEach(account => {
     const displayName = groupDisplayNames[account.groupName] || account.groupName;
     
-    message += `**${displayName}**\n`;
-    message += `  💰 Số dư TK: €${account.bankBalance.toFixed(2)}\n`;
-    
-    const diffEmoji = account.difference == 0 ? "✅" : "⚠️";
-    message += `  ${diffEmoji} Chênh lệch: €${account.difference.toFixed(2)}\n`;    
+    message += `*${displayName}*: `;
+    message += ` *€${account.bankBalance.toFixed(2)}*`;  
     
     if (account.accountNumber) {
-      message += `  🏛️ TK số: ${account.accountNumber}\n`;
+      message += ` trong TK số: ${account.accountNumber}.`;
     }
     
     if (account.updateDate) {
-      message += `  📅 Cập nhật: ${account.updateDate}\n`;
+      message += ` _Cập nhật: ${account.updateDate}_\n\n`;
     }
-    
-    message += "\n";
   });
 
-  message += "=" .repeat(35) + "\n";
-  message += `**Tổng số dư TK: €${balanceData.totalBankBalance.toFixed(2)}**\n`;
-  
-  if (balanceData.totalDifference !== 0) {
-    const totalDiffEmoji = balanceData.totalDifference > 0 ? "✅" : "⚠️";
-    message += `${totalDiffEmoji} **Tổng chênh lệch: €${balanceData.totalDifference.toFixed(2)}**\n`;
-  }
+  //message += "=" .repeat(35) + "\n";
+  //message += `**Tổng số dư TK: €${balanceData.totalBankBalance.toFixed(2)}**\n`;
 
   return message;
 }

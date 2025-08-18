@@ -46,8 +46,8 @@ function processBankAlerts() {
         
       } else if (aiResult.intent === 'AddTx') {
         // Xử lý giao dịch thông thường (giữ nguyên logic cũ)
-        const groupTx = aiResult.group || '🛒 Chi phí biến đổi';
-        const typeTx = aiResult.type || 'Thu';
+        const groupTx = aiResult.group || '🛒Chi phí biến đổi';
+        const typeTx = aiResult.type || '🛒Chợ';
         const dateTx = aiResult.date || '';
         const descTx = aiResult.desc || '';
         const amountTx = aiResult.amount || '0';

@@ -322,13 +322,13 @@ function handleModifyBudget(intentObj) {
 //xử lý intent getFundBalance - lấy số dư quỹ
 function handleGetFundBalance(intentObj) {
   try {
-    const result = getFundBalances("all");
-    const formattedResult = formatFundBalances(result);
+    var result = formatBankAccountBalances(getBankAccountBalances());    
+    result += "\n" +formatFundBalances(getFundBalances("saving"));     
 
     return {
       success: true,
-      messages: [intentObj.confirmation || formattedResult],
-      logs: ["Fund balance retrieved"]
+      messages: [intentObj.confirmation || result],
+      logs: ["Balances retrieved"]
     };
 
   } catch (error) {

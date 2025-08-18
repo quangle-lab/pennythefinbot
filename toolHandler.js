@@ -64,7 +64,7 @@ tools =[
   {
     "type": "function",
     "name": "getFundBalances",
-    "description": "Get fund balances for specific fund types or all funds",
+    "description": "Get fund balances for specific fund types or all funds. This doesn not include the bank account balances for fix and variable expenses",
     "strict": true,
     "parameters": {
       "type": "object",
@@ -212,61 +212,13 @@ tools =[
   {
     "type": "function",
     "name": "getBankAccountBalances",
-    "description": "Retrieve bank account balance data from the dashboard spreadsheet",
+    "description": "Retrieve the real bank account balances data to compare with the calculated the to spend",
     "strict": true,
     "parameters": {
       "type": "object",
       "properties": {},
       "additionalProperties": false,
       "required": []
-    }
-  },
-  {
-    "type": "function",
-    "name": "updateBankAccountBalance",
-    "description": "Update bank account balance for a specific account number",
-    "strict": true,
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "accountNumber": {
-          "type": "string",
-          "description": "Bank account number (e.g., 'FR76 XXXX XXXX XXXX XXXX XXXX XXX')"
-        },
-        "balance": {
-          "type": "string",
-          "description": "New account balance in euro format (e.g., '€1,234.56')"
-        },
-        "date": {
-          "type": "string",
-          "description": "Date of the balance update in DD/MM/YYYY format"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "accountNumber",
-        "balance",
-        "date"
-      ]
-    }
-  },
-  {
-    "type": "function",
-    "name": "formatBankAccountBalances",
-    "description": "Format bank account balance data for display",
-    "strict": true,
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "balanceData": {
-          "type": "object",
-          "description": "Bank account balance data object returned by getBankAccountBalances"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "balanceData"
-      ]
     }
   }
 ]
