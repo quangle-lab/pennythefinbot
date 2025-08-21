@@ -1481,7 +1481,7 @@ function getTxCat() {
   const catTxSheet = SpreadsheetApp.openById(SPREADSHEET_ID);
 
   const promptParts = [];
-  promptParts.push("Các giao dịch tài chính được phân vào các nhóm/mục như sau:");
+  promptParts.push("##Cácnhóm/mục giao dịch");
 
   namedRanges.forEach((rangeName, index) => {
     const namedRange = catTxSheet.getRangeByName(rangeName);
@@ -1507,7 +1507,7 @@ function getTxCat() {
     });
 
     if (items.length > 0) {
-      promptParts.push(`\n${index + 1}/ ${groupName}:\n${items.join('\n')}`);
+      promptParts.push(`\n###${groupName}:\n${items.join('\n')}`);
     }
   });
   
@@ -1539,7 +1539,7 @@ function getFamilyContext() {
   const parts = [];
 
   if (contextMap.has("Hoàn cảnh")) {
-    parts.push("🏠 Hoàn cảnh hộ gia đình:");
+    parts.push("##Hoàn cảnh hộ gia đình");
     parts.push(...contextMap.get("Hoàn cảnh"));
   }
 
@@ -1571,7 +1571,7 @@ function getCategoriseInstructions() {
   const parts = [];
 
    if (contextMap.has("Chỉ dẫn phân loại")) {
-    parts.push("🔍 Hướng dẫn phân loại giao dịch:");
+    parts.push("##Hướng dẫn phân loại giao dịch:");
     parts.push(...contextMap.get("Chỉ dẫn phân loại"));
   }
 
@@ -1603,7 +1603,7 @@ function getBudgetInstructions() {
   const parts = [];
 
   if (contextMap.has("Chỉ dẫn dự toán")) {
-    parts.push("💶 Hướng dẫn dự toán:");
+    parts.push("##Hướng dẫn dự toán:");
     parts.push(...contextMap.get("Chỉ dẫn dự toán"));
   }
 

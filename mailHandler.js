@@ -46,6 +46,15 @@ function processBankAlerts() {
         
       } else if (aiResult.intent === 'AddTx') {
         // Xử lý giao dịch thông thường (giữ nguyên logic cũ)
+        if (!isValidTransaction(aiResult, subject, body, message)) {
+          Logger.log(`Bỏ qua email không phải giao dịch: ${subject}`);
+          // Đánh dấu đã xử lý nhưng không thêm vào sheet
+          message.star();
+          message.markRead();
+          continue;
+        }
+
+
         const groupTx = aiResult.group || '🛒Chi phí biến đổi';
         const typeTx = aiResult.type || '🛒Chợ';
         const dateTx = aiResult.date || '';
@@ -83,7 +92,7 @@ function processBankAlerts() {
       } else {
         // Intent không xác định hoặc lỗi
         Logger.log(`Không xác định được loại thông báo: ${subject}`);
-        sendTelegramMessage(`❓ Không thể xác định loại thông báo từ email: ${subject}`);
+        sendLog (`❓ Không thể xác định loại thông báo từ email: ${subject}`);
       }
 
       // Đánh dấu đã xử lý

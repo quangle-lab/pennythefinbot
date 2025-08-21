@@ -240,7 +240,7 @@ function handleGetMonthlyReport(intentObj, replyText) {
 }
 
 //xử lý intent createBudget - tạo dự toán
-function handleCreateBudget(intentObj) {
+function handleCreateBudget(intentObj, replyText) {
   try {
     const { sourceMonth, month } = intentObj;
 
@@ -270,7 +270,7 @@ function handleCreateBudget(intentObj) {
     }
     
     // Generate budget analysis
-    const budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth);
+    const budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth, replyText);
     const budgetAnalysis = analyseDataWithOpenAI(budgetPrompt);
     messages.push(budgetAnalysis);
     
@@ -497,7 +497,7 @@ function handleIntent(intentObj, originalText, replyText) {
         return handleGetMonthlyReport(intentObj, replyText);
 
       case "createBudget":
-        return handleCreateBudget(intentObj);
+        return handleCreateBudget(intentObj, replyText);
 
       case "modifyBudget":
         return handleModifyBudget(intentObj);

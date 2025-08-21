@@ -1,7 +1,7 @@
 //tạo các prompts
 
 //prompt phân loại giao dịch từ email -- DEPRECATED
-function generateClassifyTransactionPrompt(subject, body) {
+/*function generateClassifyTransactionPrompt(subject, body) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
 
   //tạo prompt hoàn cảnh và phân loại
@@ -60,7 +60,7 @@ function generateClassifyTransactionPrompt(subject, body) {
       `,
     userMessage: mainPrompt
   };
-}
+}*/
 
 //prompt phân loại cập nhật số dư tài khoản ngân hàng từ email
 function generateBankBalanceClassificationPrompt(subject, body) {
@@ -85,13 +85,16 @@ function generateBankBalanceClassificationPrompt(subject, body) {
   # Instruction
   ## Bước phân tích
   Dựa vào nội dung email, hãy xác định đây là loại thông báo nào:
-  - Bước 1: Kiểm tra xem email có chứa thông tin về số dư tài khoản không
+  - Bước 1: Kiểm tra tiêu đề email
+    - Nếu tiêu đề email có chữ "solde" thì đây là thông báo số dư tài khoản, ví dụ: "Solde - dernières opérations"
+    - Nếu tiêu đề email có chữ "opération", "mouvements" thì đây là thông báo giao dịch thông thường. Ví dụ: "Mouvements cartes bancaires", "Opération créditrice", "Opération débitrice"
+  - Bước 2: Kiểm tra nội dung email có chứa thông tin về số dư tài khoản không
       - Tìm các từ khóa: "solde", "balance", "compte", "account", "soldes", "balances"
-      - Tìm số tài khoản: thường có định dạng "Compte n°X0371 XXXXXX509 01", các sô cuối 
+      - Tìm số tài khoản: thường có định dạng "Compte n°X0371 XXXXXX509 01"
       - Tìm số tiền số dư (format: €X,XXX.XX hoặc X XXX,XX €)
-  - Bước 2: Nếu là thông báo số dư tài khoản, trả về intent "UpdateBankBalance"
-  - Bước 3: Nếu là thông báo giao dịch thông thường, trả về intent "AddTx"
-  - Bước 4: Trả về thông tin chi tiết theo cấu trúc JSON
+  - Bước 3: Nếu là thông báo số dư tài khoản, trả về intent "UpdateBankBalance"
+  - Bước 4: Nếu là thông báo giao dịch thông thường, trả về intent "AddTx"
+  - Bước 5: Trả về thông tin chi tiết theo cấu trúc JSON
 
   ## Định dạng phản hồi
   Trả về kết quả dưới dạng JSON, không có dấu code block, không có lời giải thích:
@@ -102,7 +105,7 @@ function generateBankBalanceClassificationPrompt(subject, body) {
     "accountNumber": "số tài khoản ngân hàng, chỉ trả 5 số cuối và bao gồm khoảng trắng, ví dụ 509 01",
     "balance": "số dư tài khoản theo định dạng €X,XXX.XX",
     "date": "ngày cập nhật số dư theo định dạng DD/MM/YYYY",
-    "group": "tên nhóm tương ứng với tài khoản (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục tiêu, Tiết kiệm)"
+    "group": "tên nhóm tương ứng với tài khoản, dùng đúng tên nhóm kèm emoji (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục tiêu, Tiết kiệm)"
   }
 
   ### Nếu là thông báo giao dịch thông thường (AddTx):
@@ -544,7 +547,7 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
 }
 
 //prompt phân tích dự toán theo tháng
-function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
+function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText, replyText) {
   var budgetAnalyticsPrompt = ""; 
 
   //tạo prompt hoàn cảnh và phân loại
@@ -565,8 +568,19 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
     # Identity
     Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân.     
     Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
+
+    # Chỉ dẫn
+    ${familyContext}.    
+    ${budgetInstructions}.
+
+    # Dữ liệu dự toán tháng ${nextMonthText} và chi tiêu tháng ${thisMonthText}
+    ${budgetData}.
+    ${dashboardData}.              
+
+    # Tin nhắn gốc
+    ${replyText}
   
-    # Instructions
+    # Các bước xử lý
     Dựa trên các thông tin về chi tiêu, hướng dẫn dự toán, hãy tiến hành các bước sau
     - Đầu tiên, xác định ngôn ngữ khách hàng đang dùng để trả lời cho khách hàng. Ví dụ nếu khách hàng hỏi bằng what is the breakdown for fix expense this month?, hãy trả lời bằng tiếng anh.
     - Bước 1: đối chiếu dự toán tháng ${nextMonthText} với chi tiêu tháng ${thisMonthText} từ phần Dữ liệu
@@ -583,11 +597,10 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
             *bold text*
             _italic text_
             [inline URL](http://www.example.com/)
-            [inline mention of a user](tg://user?id=123456789)        
+            [inline mention of a user](tg://user?id=123456789)   
 
-    
+    # Kết quả
       🧐 *Đối chiếu Dự toán ${nextMonthText} vs. Chi tiêu ${thisMonthText} *. 
-
       *🫣Tình hình chi tiêu tháng ${thisMonthText}*      
         *🏡Chi phí cố định*
         - tổng số thực chi và chênh lệch kèm giải thích chênh lệch tốt và xấu
@@ -605,12 +618,6 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText) {
         
       *💶Dự toán tháng ${nextMonthText}*      
        - <tên mục>:  <số tiền đề nghị>. Dựa trên mục tiêu tài chính trong hoàn cảnh, giải thích lí do của đề nghị tăng hay giảm so với mức dự toán cũ (ngoại trừ thu nhập).      
-
-    # Dữ liệu
-    ${familyContext}.
-    ${budgetInstructions}.
-    ${budgetData}.
-    ${dashboardData}.              
   `;
 
   return {         
