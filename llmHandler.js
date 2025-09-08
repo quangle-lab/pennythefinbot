@@ -181,7 +181,7 @@ function analyseDataWithOpenAI(promptData) {
   const apiKey = OPENAI_TOKEN;
 
   // Create payload with conversation context
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false, "gpt-4o");
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.7, false, "gpt-4.1");
 
   const options = {
     method: "POST",

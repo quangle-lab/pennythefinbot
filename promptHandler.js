@@ -100,31 +100,33 @@ function generateBankBalanceClassificationPrompt(subject, body) {
   Trả về kết quả dưới dạng JSON, không có dấu code block, không có lời giải thích:
 
   ### Nếu là thông báo số dư tài khoản (UpdateBankBalance):
-  {
-    "intent": "UpdateBankBalance",
-    "accountNumber": "số tài khoản ngân hàng, chỉ trả 5 số cuối và bao gồm khoảng trắng, ví dụ 509 01",
-    "balance": "số dư tài khoản theo định dạng €X,XXX.XX",
-    "date": "ngày cập nhật số dư theo định dạng DD/MM/YYYY",
-    "group": "tên nhóm tương ứng với tài khoản, dùng đúng tên nhóm kèm emoji (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục tiêu, Tiết kiệm)"
-  }
+    {
+      "intent": "UpdateBankBalance",
+      "accountNumber": "số tài khoản ngân hàng, chỉ trả 5 số cuối và bao gồm khoảng trắng, ví dụ 509 01",
+      "balance": "số dư tài khoản theo định dạng €X,XXX.XX",
+      "date": "ngày cập nhật số dư theo định dạng DD/MM/YYYY",
+      "group": "tên nhóm tương ứng với tài khoản, dùng đúng tên nhóm kèm emoji (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục tiêu, Tiết kiệm)"
+    }
 
   ### Nếu là thông báo giao dịch thông thường (AddTx):
-  {
-    "intent": "AddTx",
-    "group": "tên nhóm cần thêm giao dịch đúng như trong danh sách, bao gồm tên và emoji",
-    "category": "mục theo đúng tên mục như mô tả",
-    "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
-    "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
-    "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
-    "amount": "số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
-    "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
-    "bankcomment": "trích chú thích Ngân hàng, chỉ ghi thông tin địa điểm phát sinh giao dịch"
-  }
+    {
+      "intent": "AddTx",
+      "group": "tên nhóm cần thêm giao dịch đúng như trong danh sách, bao gồm tên và emoji",
+      "category": "mục theo đúng tên mục như mô tả",
+      "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
+      "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
+      "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
+      "amount": "số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
+      "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
+      "bankcomment": "trích chú thích Ngân hàng, chỉ ghi thông tin địa điểm phát sinh giao dịch"
+    }
 
   # Hoàn cảnh gia đình khách hàng và các chỉ dẫn phân loại/dự toán cần thiết
   ${familyContext}
-  \n${catInstructions}
-  \n${catPrompt}
+  
+  ${catInstructions}
+  
+  ${catPrompt}
 
   `;
 
@@ -166,7 +168,7 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
 
   # Instructions
   ## Bước
-  - Bước 1: so sánh giữa tin nhắn giao dịch gốc và tinh phản hồi của khách hàng trong phần trao đổi
+  - Bước 1: so sánh giữa tin nhắn giao dịch gốc và tin phản hồi của khách hàng trong phần trao đổi
   - Bước 2: tìm kiếm trong Hòan cảnh và Chỉ dẫn phân loại
   - Bước 3: so sánh trong các mục và nhóm phân loại
   - Bước 4: suy ra thông tin hướng dẫn phân loại hoặc hoàn cảnh mới
@@ -179,11 +181,12 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
         "instructionGroup": có 1 trong 3 giá trị:
           - "Hoàn cảnh": bổ sung thông tin về hoàn cảnh gia đình như thành phần gia đình, con cái, nhà cửa
           - "Chỉ dẫn phân loại": bổ sung thông tin để việc phân loại tốt hơn như nơi phát sinh giao dịch,các địa điểm, cửa hàng và các mục tương ứng
-          - "Chỉ dẫn dự toán": bổ sung thông tin để việc phân loại tốt hơn như nơi phát sinh giao dịch, các địa điểm, cửa hàng và các mục tương ứng
+          - "Chỉ dẫn dự toán": bổ sung thông tin để việc dự toán tốt hơn như số tiền dự toán, mục dự toán, nhóm dự toán 
         "instructionName": tên của topic, ví dụ:
             Hoàn cảnh: Gia đinh, con cái, xe, thú cưng, thói quen sống
             Chỉ dẫn phân loại: hướng dẩn để cải thiện phân loại dựa trên phần hồi của khách hàng, ghi chú gốc của ngân hàng
-        "instructionContent": điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn
+            Chỉ dẫn dự toán: hướng dẩn để cải thiện dự toán dựa trên phần hồi của khách hàng, số tiền dự toán, mục dự toán, nhóm dự toán
+        "instructionContent": trả về dưới dạng "các giao dịch có ghi chú của ngân hàng là ..., phân vào nhóm ... và mục ... tương ứng"
         Ví dụ:
           "instructionGroup":"Chỉ dẫn phân loại"
           "instructionName":"Hoàn tiền bảo hiểm"
@@ -234,75 +237,74 @@ function generateIntentDetectionPrompt (originalText, replyText) {
   Đây là nội dung trao đổi giữa bạn và khách hàng: "${userText}", 
   
   # Hướng dẫn
-  ## Các mục giao dịch
   Luôn luôn tuân thủ tuyệt đối tên của nhóm và mục trong các chỉ dẫn sau đây, bao gồm cả tên và emoji.
-  \n${categories}
+  ${categories}
   
-  ## Chỉ dẫn dự toán
-  \n${budgetInstructions}
+  ${budgetInstructions}
+  
+  ${categoriseInstructions}
 
-  ## Chỉ dẫn phân loại
-  \n${categoriseInstructions}
+  ${familyContext}      
   
   ## Danh sách ý định
   Dựa vào nội dung trao đổi, thông tin dự toán của tháng hiện tại, hãy xác định xem ý định (intent) của khách hàng dựa trên danh sách sau
-        - addTx: thêm thủ công 1 giao dịch mới
-        - modifyTx: cập nhật dòng giao dịch (số tiền, ngày chi, miêu tả, mục trong cùng nhóm) hoặc chuyển dòng qua nhóm và mục mới. Dùng đúng tên Nhóm và mục như trong Các mục giao dịch
-            - Ví dụ 1
-              - Tin gốc: "Thu €88.71 cho Hoàn tiền bảo hiểm GENERATION ✏️Ghi vào 🛟Quỹ gia đình, mục 🚰Thu, dòng 25".
-              - Phản hồi của khách hàng: đây là chinh phí bảo hiểm sức khỏe.
-              - Ý định: phân loại sai. Cần chuyển từ Nhóm Quỹ gia đình > Thu sang Chi phí cố định > BH sức khỏe.
-            - Ví dụ 2
-              - Tin gốc: "💸Chi €4.13 cho Đặt đồ ăn UBER EATS ✏️Ghi vào 🛒Chi phí biến đổi, mục Chợ, dòng 102".
-              - Phản hồi của khách hàng: này là tiền ăn ngoài.
-              - Ý định: phân loại sai. Cần chuyển từ mục Chợ thành Ăn ngoài.
-        - deleteTx: xóa dòng giao dịch           
-        - getMonthlyReport: yêu cầu báo cáo chi tiêu cho tháng
-            Ví dụ
-              "Cho mình xem báo cáo chi tiêu tháng này"
-              "Tháng này còn dư bao nhiêu?"
-              "Tháng này còn mục nào chi hay không?"
-              "Mình chi tiêu mục nào nhiều nhất trong nhóm chi phí cố định?"
-              "Chi phí cho mèo tháng này hết bao nhiêu tiền rồi?"
-        - addNewBudget: tạo dự toán cho tháng mới hoặc dự án mới        
-        - modifyBudget: cập nhật dự toán dự trên thông tin bạn đề nghị
-          - Ví dụ 1
-            - Tin gốc: "Tăng mục Ăn ngoài lên €200 cho tháng tới"            
-            - Ý định: cần tăng mục Ăn ngoài lên €200 cho tháng tới
-          - Ví dụ 2
-            - Tin gốc: "Giảm mục Xe hơi xuống 0"            
-            - Ý định: cần giảm mục Xe hơi xuống 0 cho tháng tới
-        - getFundBalance: lấy số dư các quỹ.            
-            - Ví dụ
-              Hỏi: tôi còn bao nhiêu tiền trong quỹ
-              Hỏi: tôi còn bao nhiêu tiền trong tài khoản ngân hàng
-              Hỏi: lấy số dư các quỹ gia đình
-              Hỏi: lấy số dư các quỹ mục đích
-              Hỏi: lấy số dư các quỹ tiết kiệm
-        - consult: tư vấn tài chính bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân
-            - Kiểm tra khả năng chi trả: phân tích xem có thể mua/chi trả một khoản tiền nào đó không
-              Ví dụ 1: "Tôi có thể mua chiếc laptop 1000 euro không?"
-              Ví dụ 2: "Tôi còn bao nhiêu tiền trong tài khoản ngân hàng tới cuối tháng?"
-            - Coaching tài chính: hỏi lời khuyên về quản lý tài chính, tiết kiệm, đầu tư
-              Ví dụ 1: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
-              Ví dụ 2: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
-              Trả lời: căn cứ vào hoàn cảnh gia đình, bạn có thể tiết kiệm những mục như ăn ngoài, mua sắm, hạn chế thuê bao số như Netflix
-        - search: tìm kiếm giao dịch theo các tiêu chí như khoảng thời gian, nhóm, mục, từ khóa trong miêu tả
-            - Ví dụ
-              Hỏi: tìm tất cả giao dịch ăn uống tháng 11
-              Hỏi: tìm giao dịch có từ "uber" trong tháng này
-              Hỏi: tìm giao dịch từ 01/11 đến 30/11 trong nhóm chi phí biến đổi
+    - addTx: thêm thủ công 1 giao dịch mới
+    - modifyTx: cập nhật dòng giao dịch (số tiền, ngày chi, miêu tả, mục trong cùng nhóm) hoặc chuyển dòng qua nhóm và mục mới. Dùng đúng tên Nhóm và mục như trong Các mục giao dịch
+      - Ví dụ 1
+        - Tin gốc: "Thu €88.71 cho Hoàn tiền bảo hiểm GENERATION ✏️Ghi vào 🛟Quỹ gia đình, mục 🚰Thu, dòng 25".
+        - Phản hồi của khách hàng: đây là chinh phí bảo hiểm sức khỏe.
+        - Ý định: phân loại sai. Cần chuyển từ Nhóm Quỹ gia đình > Thu sang Chi phí cố định > BH sức khỏe.
+      - Ví dụ 2
+        - Tin gốc: "💸Chi €4.13 cho Đặt đồ ăn UBER EATS ✏️Ghi vào 🛒Chi phí biến đổi, mục Chợ, dòng 102".
+        - Phản hồi của khách hàng: này là tiền ăn ngoài.
+        - Ý định: phân loại sai. Cần chuyển từ mục Chợ thành Ăn ngoài.
+    - deleteTx: xóa dòng giao dịch           
+    - getMonthlyReport: yêu cầu báo cáo chi tiêu cho tháng
+      - Ví dụ
+        - "Cho mình xem báo cáo chi tiêu tháng này"
+        - "Tháng này còn dư bao nhiêu?"
+        - "Tháng này còn mục nào chi hay không?"
+        - "Mình chi tiêu mục nào nhiều nhất trong nhóm chi phí cố định?"
+        - "Chi phí cho mèo tháng này hết bao nhiêu tiền rồi?"
+    - addNewBudget: tạo dự toán cho tháng mới hoặc dự án mới        
+    - modifyBudget: cập nhật dự toán dự trên thông tin bạn đề nghị
+        - Ví dụ 1
+          - Tin gốc: "Tăng mục Ăn ngoài lên €200 cho tháng tới"            
+          - Ý định: cần tăng mục Ăn ngoài lên €200 cho tháng tới
+        - Ví dụ 2
+          - Tin gốc: "Giảm mục Xe hơi xuống 0"            
+          - Ý định: cần giảm mục Xe hơi xuống 0 cho tháng tới
+    - getFundBalance: lấy số dư các quỹ.            
+      - Ví dụ
+        - Hỏi: tôi còn bao nhiêu tiền trong quỹ
+        - Hỏi: tôi còn bao nhiêu tiền trong tài khoản ngân hàng
+        - Hỏi: lấy số dư các quỹ gia đình
+        - Hỏi: lấy số dư các quỹ mục đích
+        - Hỏi: lấy số dư các quỹ tiết kiệm
+    - consult: tư vấn tài chính bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân
+      - Kiểm tra khả năng chi trả: phân tích xem có thể mua/chi trả một khoản tiền nào đó không
+        - Ví dụ 1: "Tôi có thể mua chiếc laptop 1000 euro không?"
+        - Ví dụ 2: "Tôi còn bao nhiêu tiền trong tài khoản ngân hàng tới cuối tháng?"
+      - Coaching tài chính: hỏi lời khuyên về quản lý tài chính, tiết kiệm, đầu tư
+        - Ví dụ 1: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
+        - Ví dụ 2: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
+        - Trả lời: căn cứ vào hoàn cảnh gia đình, bạn có thể tiết kiệm những mục như ăn ngoài, mua sắm, hạn chế thuê bao số như Netflix
+    - search: tìm kiếm giao dịch theo các tiêu chí như khoảng thời gian, nhóm, mục, từ khóa trong miêu tả
+      - Ví dụ
+        - Hỏi: tìm tất cả giao dịch ăn uống tháng 11
+        - Hỏi: tìm giao dịch có từ "uber" trong tháng này
+        - Hỏi: tìm giao dịch từ 01/11 đến 30/11 trong nhóm chi phí biến đổi
         - others: các intent khác, kèm theo ghi chú trong mục note
           Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, tư vấn tài chính (bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân), và tìm kiếm giao dịch
           
   ## Tin nhắn nhiều ý định
   Trong một tin nhắn của khách hàng có thể có nhiều ý định:
-  Ví dụ 1: khách hàng yêu cầu chuyển 600 EUR từ quỹ mục đích sang quỹ gia đình thì có 2 ý định
-            1/ intent trong nhóm quỹ gia đình, mục Chuyển nội bộ, số tiền 600 EUR
-            2/ intent trong nhóm quỹ mục đích, mục Thu, số tiền 600 EUR
-  Ví dụ 2: khách hàng yêu cầu chi trả tiền cấp cứu mèo bằng quỹ gia đình 200 EUR thì có 2 ý định
-            1/ intent trong nhóm quỹ gia đình, mục Phát sinh, số tiền 200 EUR
-            2/ intent trong nhóm chi phí biến đổi, mục Mèo, số tiền 200 EUR
+  - Ví dụ 1: khách hàng yêu cầu chuyển 600 EUR từ quỹ mục đích sang quỹ gia đình thì có 2 ý định
+    - 1/ intent trong nhóm quỹ gia đình, mục Chuyển nội bộ, số tiền 600 EUR
+    - 2/ intent trong nhóm quỹ mục đích, mục Thu, số tiền 600 EUR
+  - Ví dụ 2: khách hàng yêu cầu chi trả tiền cấp cứu mèo bằng quỹ gia đình 200 EUR thì có 2 ý định
+    - 1/ intent trong nhóm quỹ gia đình, mục Phát sinh, số tiền 200 EUR
+    - 2/ intent trong nhóm chi phí biến đổi, mục Mèo, số tiền 200 EUR
   Trả về 1 danh sách sau dưới dạng JSON, không có dấu code block.
       {"intents": [
         //mảng các intent được miêu tả dưới đây
@@ -324,6 +326,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "tab":"tên nhóm phân loại hiện tại, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji",
         "newtab": "tên nhóm mới nếu khách hàng yêu cầu chuyển giao dịch qua nhóm mới. Tuân thủ tuyệt đối đúng tên nhóm như trong danh sách, cả chữ lẫn emoji. Trả về rỗng nếu chỉ cầp cập nhật thông tin giao dịch như miêu tả, số tiền, mục trong cùng nhóm",
         "date":"ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
+        "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi', chỉ áp dụng cho intent 'addTx' hoặc 'modifyTx'",
         "desc":"miêu tả về giao dịch, ngắn gọn, tối đa 30 ký tự, dựa trên miêu tả cũ và yêu cầu của khách hàng",
         "amount":"số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
         "location":"nơi phát sinh giao dịch. 3 giá trị thường gặp là Rennes, Nantes, N/A",
@@ -395,10 +398,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "intent":"others",
         "reply":"câu trả lời của bạn cho khách hàng",
         "note:"ghi chú của bạn về ý định của khách hàng để có thể hỗ trợ tốt hơn lần sau"
-      }.
-    
-  # Hoàn cảnh gia đình khách hàng
-      ${familyContext}      
+      }.          
     `;
 
   return {
@@ -561,30 +561,23 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText, replyText) 
 
   //lấy chi tiêu tháng hiện tại
   const dashboardData = getDashboardData (thisMonthText);
+
+  //lấy số dư các quỹ
+  const fundBalances = formatFundBalances(getFundBalances());
   
   budgetAnalyticsPrompt = `
     The current time is ${currentTime}. The date format is dd/MM/yyyy.
 
-    # Identity
+    # Danh tính
     Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân.     
     Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
 
-    # Chỉ dẫn
-    ${familyContext}.    
-    ${budgetInstructions}.
-
-    # Dữ liệu dự toán tháng ${nextMonthText} và chi tiêu tháng ${thisMonthText}
-    ${budgetData}.
-    ${dashboardData}.              
-
-    # Tin nhắn gốc
-    ${replyText}
-  
-    # Các bước xử lý
-    Dựa trên các thông tin về chi tiêu, hướng dẫn dự toán, hãy tiến hành các bước sau
-    - Đầu tiên, xác định ngôn ngữ khách hàng đang dùng để trả lời cho khách hàng. Ví dụ nếu khách hàng hỏi bằng what is the breakdown for fix expense this month?, hãy trả lời bằng tiếng anh.
+    # Yêu cầu khách hàng
+    ## Các bước phân tích
+    Dựa trên các thông tin về chi tiêu, hoàn cảnh, chỉ dẫn dự toán, hãy tiến hành các bước sau và trả lời cho khách hàng.
+    Đầu tiên, xác định ngôn ngữ khách hàng đang dùng để trả lời cho khách hàng. Ví dụ nếu khách hàng hỏi bằng what is the breakdown for fix expense this month?, hãy trả lời bằng tiếng anh.
     - Bước 1: đối chiếu dự toán tháng ${nextMonthText} với chi tiêu tháng ${thisMonthText} từ phần Dữ liệu
-    - Bước 2: tra cứu các chỉ dẫn dự toán xem tháng sau có phát sinh giao dịch gì không
+    - Bước 2: tra cứu các chỉ dẫn dự toán xem tháng sau có phát sinh giao dịch gì không từ phẩn Chỉ dẫn
     - Bước 3: dựa trên các thông tin trên, đề xuất các thay đổi cho dự toán tháng ${nextMonthText}  
     - Bước 4: trả lời cho khách hàng theo cấu trúc sau và tuần thủ yêu cầu trình bày
       - Giới hạn trong 250 ký tự
@@ -597,10 +590,9 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText, replyText) 
             *bold text*
             _italic text_
             [inline URL](http://www.example.com/)
-            [inline mention of a user](tg://user?id=123456789)   
+            [inline mention of a user](tg://user?id=123456789)       
 
-    # Kết quả
-      🧐 *Đối chiếu Dự toán ${nextMonthText} vs. Chi tiêu ${thisMonthText} *. 
+    ## Cấu trúc trả lời      
       *🫣Tình hình chi tiêu tháng ${thisMonthText}*      
         *🏡Chi phí cố định*
         - tổng số thực chi và chênh lệch kèm giải thích chênh lệch tốt và xấu
@@ -617,7 +609,24 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText, replyText) 
         - 🫙Thu vào tiết kiệm: tổng số thực tế và chênh lệch
         
       *💶Dự toán tháng ${nextMonthText}*      
-       - <tên mục>:  <số tiền đề nghị>. Dựa trên mục tiêu tài chính trong hoàn cảnh, giải thích lí do của đề nghị tăng hay giảm so với mức dự toán cũ (ngoại trừ thu nhập).      
+       - <tên mục>:  <số tiền đề nghị cho tháng>. Dựa trên mục tiêu tài chính trong hoàn cảnh và chỉ dẫn dự toán, giải thích lí do của đề nghị tăng hay giảm so với mức dự toán cũ (ngoại trừ thu nhập).  
+
+    # Chỉ dẫn
+    ${familyContext}.    
+    ${budgetInstructions}.
+
+    # Dữ liệu 
+    ## Dự toán tháng ${nextMonthText} 
+    ${budgetData}.
+
+    ## Chi tiêu tháng ${thisMonthText}
+    ${dashboardData}.              
+
+    ## Số dư các quỹ
+    ${fundBalances}.
+
+    # Tin nhắn gốc
+    ${replyText}    
   `;
 
   return {         

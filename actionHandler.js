@@ -4,7 +4,7 @@
 //xử lý intent addTx - thêm giao dịch
 function handleAddTransaction(intentObj) {
   try {
-    const { tab } = intentObj.tab;
+    const tab = intentObj.tab;
     const dateTx = intentObj.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
     // Prepare transaction data for addConfirmedTransaction
@@ -110,7 +110,7 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
       // Add to new sheet
       newSheet.appendRow([
         current.date,
-        current.description,
+        intentObj.desc || current.description,
         current.amount,
         current.location,
         intentObj.category,
@@ -299,7 +299,7 @@ function handleModifyBudget(intentObj) {
       const category = change.category;
       const group = change.group;
       const note = change["ghi chú"];
-      const amount = parseFloat(change.amount.replace(/[€\s]/g, ""));
+      const amount = change.amount;
       const result = setBudgetChange(month, group, category, amount, note);
       results.push(result);
     });

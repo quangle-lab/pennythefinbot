@@ -159,6 +159,11 @@ function setBudgetChange(month, group, category, amount, note) {
   return `➕ Đã thêm dự toán tháng ${month} cho *${category}* (${group}): €${amount}`;
 }
 
+//helper function để format số với dấu phân cách hàng nghìn
+function formatNumberWithSeparator(number) {
+  return number.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 //lấy dữ liệu dự toán cho tháng monthText (MM/yyyy)
 function getBudgetData (monthText) {  
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("💶Dự toán");
@@ -179,7 +184,7 @@ function getBudgetData (monthText) {
     const category = row[2];
     const budget = row[3];
     if (!summary[tab]) summary[tab] = [];
-    summary[tab].push(`- ${category}: €${budget.toFixed(2)}`);
+    summary[tab].push(`- ${category}: €${formatNumberWithSeparator(budget)}`);
   });
 
   let monthBudgetData = `Dự toán của tháng *${monthText}*\n============`;
@@ -1481,7 +1486,7 @@ function getTxCat() {
   const catTxSheet = SpreadsheetApp.openById(SPREADSHEET_ID);
 
   const promptParts = [];
-  promptParts.push("##Cácnhóm/mục giao dịch");
+  promptParts.push("## Các nhóm/mục giao dịch");
 
   namedRanges.forEach((rangeName, index) => {
     const namedRange = catTxSheet.getRangeByName(rangeName);
@@ -1507,7 +1512,7 @@ function getTxCat() {
     });
 
     if (items.length > 0) {
-      promptParts.push(`\n###${groupName}:\n${items.join('\n')}`);
+      promptParts.push(`\n### ${groupName}:\n${items.join('\n')}`);
     }
   });
   
@@ -1539,7 +1544,7 @@ function getFamilyContext() {
   const parts = [];
 
   if (contextMap.has("Hoàn cảnh")) {
-    parts.push("##Hoàn cảnh hộ gia đình");
+    parts.push("## Hoàn cảnh hộ gia đình");
     parts.push(...contextMap.get("Hoàn cảnh"));
   }
 
@@ -1571,7 +1576,7 @@ function getCategoriseInstructions() {
   const parts = [];
 
    if (contextMap.has("Chỉ dẫn phân loại")) {
-    parts.push("##Hướng dẫn phân loại giao dịch:");
+    parts.push("## Hướng dẫn phân loại giao dịch:");
     parts.push(...contextMap.get("Chỉ dẫn phân loại"));
   }
 
@@ -1603,7 +1608,7 @@ function getBudgetInstructions() {
   const parts = [];
 
   if (contextMap.has("Chỉ dẫn dự toán")) {
-    parts.push("##Hướng dẫn dự toán:");
+    parts.push("## Hướng dẫn dự toán:");
     parts.push(...contextMap.get("Chỉ dẫn dự toán"));
   }
 
