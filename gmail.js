@@ -18,7 +18,7 @@ function processBankAlerts() {
       Logger.log (body);
 
       // Gọi OpenAI để phân loại thông minh - có thể là giao dịch hoặc cập nhật số dư
-      const aiResult = classifyBankBalanceWithOpenAI(subject, body);
+      const aiResult = classifyBankBalance(subject, body);
 
       // Kiểm tra intent từ kết quả AI
       if (aiResult.intent === 'UpdateBankBalance') {

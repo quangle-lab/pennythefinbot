@@ -1,67 +1,5 @@
 //tạo các prompts
 
-//prompt phân loại giao dịch từ email -- DEPRECATED
-/*function generateClassifyTransactionPrompt(subject, body) {
-  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
-
-  //tạo prompt hoàn cảnh và phân loại
-  const familyContext = getFamilyContext();
-  const catInstructions = getCategoriseInstructions();
-  const catPrompt = getTxCat();
-
-  let mainPrompt = `
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
-
-  # Identity  
-  Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
-  Nhiệm vụ của bạn là 
-  - phân loại các giao dịch, thay đổi theo yêu cầu khách hàng và cải thiện chế độ phân loại
-  - đề xuất dự toán hàng tháng, thay đổi số tiền trong dự toán theo yêu cầu của khách hàng
-  Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
-
-  # Nội dung email từ ngân hàng của khách hàng
-  - Tiêu đề email: ${subject}
-  - Nội dung email: ${body}
-  
-  # Instruction
-  ## Bước
-  Dựa vào các thông tin dưới đây hãy tiến hành phân loại giao dịch.
-  - Bước 1: tìm kiếm trong Hòan cảnh và Chỉ dẫn phân loại
-  - Bước 2: phân loại giao dịch, 
-      - nếu trong tiêu đề email có chữ débitrice, mouvement carte bancaire thì đây là giao dịch chi tiền
-      - nếu trong tiêu đề email có chữ créditrice, thì đây là giao dịch thu tiền
-      - nếu trong nội dung email có chữ "virement Thuy Van" hay "Quang" thì đây là chuyển khoản nội bộ
-  - Bước 3: trả lời cho khách hàng theo cấu trúc sau và tuần thủ yêu cầu trình bày
-
-  ## Định dạng phản hồi
-  Trả về kết quả dưới dạng JSON 9 khóa sau, không có dấu code block, không có lời giải thích:
-    - group: tên nhóm cần thêm giao dịch đúng như trong danh sách
-    - category: mục theo đúng tên mục như mô tả
-    - type: có 2 giá trị "🤑Thu" hoặc "💸Chi"
-    - date: ngày phát sinh giao dịch theo định dạng DD/MM/YYYY
-    - desc: ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự
-    - amount: số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)
-    - location: thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A
-    - bankcomment: trích chú thích Ngân hàng, chỉ ghi thông tin địa điểm phát sinh giao dịch
-
-  # Hoàn cảnh gia đình khách hàng và các chỉ dẫn phân loại/dự toán cần thiết
-  ${familyContext}
-  \n${catInstructions}
-  \n${catPrompt}
-
-  `;
-
-  return {
-    systemMessage: `      
-      The current time is ${currentTime}
-      ## PERSISTENCE
-      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
-      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.      
-      `,
-    userMessage: mainPrompt
-  };
-}*/
-
 //prompt phân loại cập nhật số dư tài khoản ngân hàng từ email
 function generateBankBalanceClassificationPrompt(subject, body) {
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
@@ -137,76 +75,6 @@ function generateBankBalanceClassificationPrompt(subject, body) {
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.      
       `,
-    userMessage: mainPrompt
-  };
-}
-
-//prompt xác định hoàn cảnh mới để cải thiện nhận diện
-function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
-  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
-
-  const originalTxDesc = `Đây là giao dịch gốc ngày ${originalTx.date}, miêu tả: ${originalTx.desc}, số tiền: ${originalTx.amount}, nơi phát sinh: ${originalTx.location}, mục phân loại: ${originalTx.category}, ghi chú của ngân hàng: ${originalTx.comment} `;
-  const userText = `Tin nhắn của bạn: ${originalText}\nPhản hồi của khách hàng: ${replyText}\n`;
-
-  //tạo prompt hoàn cảnh và phân loại
-  const familyContext = getFamilyContext();
-  const categoriseInstructions = getCategoriseInstructions();
-  const categories = getTxCat();
-
-  let mainPrompt = `
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
-    
-  # Identity  
-  Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
-  Nhiệm vụ của bạn là 
-  - phân loại các giao dịch, thay đổi theo yêu cầu khách hàng và cải thiện chế độ phân loại
-  - đề xuất dự toán hàng tháng, thay đổi số tiền trong dự toán theo yêu cầu của khách hàng
-
-  # Nội dung trao đổi
-  - Đây là thông tin giao dịch gốc ${originalTxDesc}\n
-  - Đây là tin nhắn của bạn kèm phàn hồi của khách hàng ${userText}\n
-
-  # Instructions
-  ## Bước
-  - Bước 1: so sánh giữa tin nhắn giao dịch gốc và tin phản hồi của khách hàng trong phần trao đổi
-  - Bước 2: tìm kiếm trong Hòan cảnh và Chỉ dẫn phân loại
-  - Bước 3: so sánh trong các mục và nhóm phân loại
-  - Bước 4: suy ra thông tin hướng dẫn phân loại hoặc hoàn cảnh mới
-      - Nếu phản hồi của khách hàng nói rõ: bỏ qua chỉ dẫn, không thêm chỉ dẫn, trả về JSON với giá trị "" cho tất cả các khóa.
-      - Nếu đã tồn tại chỉ dẫn có giá trị tương đồng trong phần Chỉ dẫn phân loại, trả về JSON với giá trị "" cho tất cả các khóa.
-      - Nếu chưa tồn tại chỉ dẫn, ghi lại điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn mà không cần hướng dẫn của người dùng và trả lại JSON theo cấu trúc sau, không có dấu code block.\
-
-  ## Định dạng phản hồi
-      {
-        "instructionGroup": có 1 trong 3 giá trị:
-          - "Hoàn cảnh": bổ sung thông tin về hoàn cảnh gia đình như thành phần gia đình, con cái, nhà cửa
-          - "Chỉ dẫn phân loại": bổ sung thông tin để việc phân loại tốt hơn như nơi phát sinh giao dịch,các địa điểm, cửa hàng và các mục tương ứng
-          - "Chỉ dẫn dự toán": bổ sung thông tin để việc dự toán tốt hơn như số tiền dự toán, mục dự toán, nhóm dự toán 
-        "instructionName": tên của topic, ví dụ:
-            Hoàn cảnh: Gia đinh, con cái, xe, thú cưng, thói quen sống
-            Chỉ dẫn phân loại: hướng dẩn để cải thiện phân loại dựa trên phần hồi của khách hàng, ghi chú gốc của ngân hàng
-            Chỉ dẫn dự toán: hướng dẩn để cải thiện dự toán dựa trên phần hồi của khách hàng, số tiền dự toán, mục dự toán, nhóm dự toán
-        "instructionContent": trả về dưới dạng "các giao dịch có ghi chú của ngân hàng là ..., phân vào nhóm ... và mục ... tương ứng"
-        Ví dụ:
-          "instructionGroup":"Chỉ dẫn phân loại"
-          "instructionName":"Hoàn tiền bảo hiểm"
-          "instructionContent":"GENERATION là tiền hoàn bảo hiểm, ghi vào mục Thu trong Quỹ gia đình"
-      }
-  
-  ##Hoàn cảnh
-    \n${familyContext}
-    \n${categoriseInstructions}
-    \n${categories}`
-
-  return {
-    systemMessage: `      
-      The current time is ${currentTime}
-      ## PERSISTENCE
-      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
-      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-      Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.  
-      You can only make mistake once. Carefully analyse the customer instruction and update your knowledge base to make sure you catetorise the transaction correctly without the need for further instructions from the customer.
-      `,    
     userMessage: mainPrompt
   };
 }
@@ -409,6 +277,76 @@ function generateIntentDetectionPrompt (originalText, replyText) {
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
       `, 
     userMessage: intentDetectionPrompt};
+}
+
+//prompt xác định hoàn cảnh mới để cải thiện nhận diện
+function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
+
+  const originalTxDesc = `Đây là giao dịch gốc ngày ${originalTx.date}, miêu tả: ${originalTx.desc}, số tiền: ${originalTx.amount}, nơi phát sinh: ${originalTx.location}, mục phân loại: ${originalTx.category}, ghi chú của ngân hàng: ${originalTx.comment} `;
+  const userText = `Tin nhắn của bạn: ${originalText}\nPhản hồi của khách hàng: ${replyText}\n`;
+
+  //tạo prompt hoàn cảnh và phân loại
+  const familyContext = getFamilyContext();
+  const categoriseInstructions = getCategoriseInstructions();
+  const categories = getTxCat();
+
+  let mainPrompt = `
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+    
+  # Identity  
+  Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
+  Nhiệm vụ của bạn là 
+  - phân loại các giao dịch, thay đổi theo yêu cầu khách hàng và cải thiện chế độ phân loại
+  - đề xuất dự toán hàng tháng, thay đổi số tiền trong dự toán theo yêu cầu của khách hàng
+
+  # Nội dung trao đổi
+  - Đây là thông tin giao dịch gốc ${originalTxDesc}\n
+  - Đây là tin nhắn của bạn kèm phàn hồi của khách hàng ${userText}\n
+
+  # Instructions
+  ## Bước
+  - Bước 1: so sánh giữa tin nhắn giao dịch gốc và tin phản hồi của khách hàng trong phần trao đổi
+  - Bước 2: tìm kiếm trong Hòan cảnh và Chỉ dẫn phân loại
+  - Bước 3: so sánh trong các mục và nhóm phân loại
+  - Bước 4: suy ra thông tin hướng dẫn phân loại hoặc hoàn cảnh mới
+      - Nếu phản hồi của khách hàng nói rõ: bỏ qua chỉ dẫn, không thêm chỉ dẫn, trả về JSON với giá trị "" cho tất cả các khóa.
+      - Nếu đã tồn tại chỉ dẫn có giá trị tương đồng trong phần Chỉ dẫn phân loại, trả về JSON với giá trị "" cho tất cả các khóa.
+      - Nếu chưa tồn tại chỉ dẫn, ghi lại điểm cần lưu ý để lần sau bạn có thể phân loại giao dịch chính xác hơn mà không cần hướng dẫn của người dùng và trả lại JSON theo cấu trúc sau, không có dấu code block.\
+
+  ## Định dạng phản hồi
+      {
+        "instructionGroup": có 1 trong 3 giá trị:
+          - "Hoàn cảnh": bổ sung thông tin về hoàn cảnh gia đình như thành phần gia đình, con cái, nhà cửa
+          - "Chỉ dẫn phân loại": bổ sung thông tin để việc phân loại tốt hơn như nơi phát sinh giao dịch,các địa điểm, cửa hàng và các mục tương ứng
+          - "Chỉ dẫn dự toán": bổ sung thông tin để việc dự toán tốt hơn như số tiền dự toán, mục dự toán, nhóm dự toán 
+        "instructionName": tên của topic, ví dụ:
+            Hoàn cảnh: Gia đinh, con cái, xe, thú cưng, thói quen sống
+            Chỉ dẫn phân loại: hướng dẩn để cải thiện phân loại dựa trên phần hồi của khách hàng, ghi chú gốc của ngân hàng
+            Chỉ dẫn dự toán: hướng dẩn để cải thiện dự toán dựa trên phần hồi của khách hàng, số tiền dự toán, mục dự toán, nhóm dự toán
+        "instructionContent": trả về dưới dạng "các giao dịch có ghi chú của ngân hàng là ..., phân vào nhóm ... và mục ... tương ứng"
+        Ví dụ:
+          "instructionGroup":"Chỉ dẫn phân loại"
+          "instructionName":"Hoàn tiền bảo hiểm"
+          "instructionContent":"GENERATION là tiền hoàn bảo hiểm, ghi vào mục Thu trong Quỹ gia đình"
+      }
+  
+  ##Hoàn cảnh
+    \n${familyContext}
+    \n${categoriseInstructions}
+    \n${categories}`
+
+  return {
+    systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+      Based on the customer goal, analyze the situation directly and clearly to help the customer achieve their personal financial goal.  
+      You can only make mistake once. Carefully analyse the customer instruction and update your knowledge base to make sure you catetorise the transaction correctly without the need for further instructions from the customer.
+      `,    
+    userMessage: mainPrompt
+  };
 }
 
 //prompt phân tích chi tiêu, dataSource có thể là: dashboard, fixEx, varEx

@@ -34,7 +34,7 @@ function checkTelegramMessages() {
     const originalText = isReplyToBot ? msg.reply_to_message.text : "";
 
     // Step 1: Detect user intent using OpenAI
-    const interpretation = detectUserIntentWithOpenAI(originalText, replyText);
+    const interpretation = detectUserIntent (originalText, replyText);
     sendLog(interpretation);
 
     if (!interpretation || !interpretation.intents) {

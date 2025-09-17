@@ -1,6 +1,64 @@
 //xử lý các hành động cho từng intent
 //mỗi hàm trả về object với structure: { success: boolean, messages: string[], logs: string[] }
 
+//dispatcher chính để xử lý tất cả các intent
+function handleIntent(intentObj, originalText, replyText) {
+  const intent = intentObj.intent;
+
+  try {
+    switch (intent) {
+      case "addTx":
+        return handleAddTransaction(intentObj);
+
+      case "modifyTx":
+        return handleModifyTransaction(intentObj, originalText, replyText);
+
+      case "deleteTx":
+        return handleDeleteTransaction(intentObj);
+
+      case "getMonthlyReport":
+        return handleGetMonthlyReport(intentObj, replyText);
+
+      case "createBudget":
+        return handleCreateBudget(intentObj, replyText);
+
+      case "modifyBudget":
+        return handleModifyBudget(intentObj);
+
+      case "getFundBalance":
+        return handleGetFundBalance(intentObj);
+
+      case "getBudget":
+        return handleGetBudget(intentObj);
+
+      case "consult":
+        return handleConsult(intentObj, replyText);
+
+      case "affordTest":
+        // DEPRECATED: Use "consult" intent instead
+        return handleAffordTest(intentObj, replyText);
+
+      case "coaching":
+        // DEPRECATED: Use "consult" intent instead
+        return handleCoaching(intentObj, replyText);
+
+      case "search":
+        return handleSearch(intentObj);
+
+      case "others":
+      default:
+        return handleOthers(intentObj);
+    }
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi không xác định khi xử lý intent "${intent}": ${error.toString()}`],
+      logs: [`Unexpected error in handleIntent for ${intent}: ${error.toString()}`]
+    };
+  }
+}
+
 //xử lý intent addTx - thêm giao dịch
 function handleAddTransaction(intentObj) {
   try {
@@ -137,7 +195,7 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
     const promptsSettingsTab = ss.getSheetByName(promptsSettings);
 
     if (promptsSettingsTab) {
-      const instruction = detectNewContextWithOpenAI(current, originalText, replyText);
+      const instruction = detectNewContext(current, originalText, replyText);
 
       if (instruction.instructionGroup && instruction.instructionName && instruction.instructionContent) {
         promptsSettingsTab.appendRow([
@@ -204,37 +262,37 @@ function handleDeleteTransaction(intentObj) {
   }
 }
 
-//xử lý intent getMonthlyReport - lấy báo cáo tháng
-function handleGetMonthlyReport(intentObj, replyText) {
+//xử lý intent getBudget - lấy dự toán của tháng
+function handleGetBudget(intentObj) {
   try {
-    const { month, year } = intentObj;
-    
-    // Determine the month to analyze
-    let monthToAnalyze;
-    if (month && year) {
-      monthToAnalyze = `${month.padStart(2, '0')}/${year}`;
-    } else if (month) {
-      const currentYear = new Date().getFullYear();
-      monthToAnalyze = `${month.padStart(2, '0')}/${currentYear}`;
-    } else {
-      monthToAnalyze = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
+    const { month } = intentObj;
+
+    // If no month specified, use current month
+    const targetMonth = month || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
+
+    // Use the existing getBudgetData function from sheetHandler
+    const budgetData = getBudgetData(targetMonth);
+
+    // Check if budget data was found
+    if (!budgetData || budgetData.includes("Dự toán của tháng") && budgetData.split('\n').length <= 2) {
+      return {
+        success: true,
+        messages: [intentObj.confirmation || `📊 Chưa có dự toán nào cho tháng ${targetMonth}.`],
+        logs: [`No budget entries found for month: ${targetMonth}`]
+      };
     }
-    
-    // Generate expense analytics prompt and get AI analysis
-    const expensePrompt = generateExpenseAnalyticsPrompt(replyText, monthToAnalyze, "dashboard");
-    const expenseAnalysis = analyseDataWithOpenAI(expensePrompt);
-    
+
     return {
       success: true,
-      messages: [expenseAnalysis],
-      logs: [`Monthly report generated for ${monthToAnalyze}`]
+      messages: [budgetData],
+      logs: [`Budget retrieved for month: ${targetMonth}`]
     };
-    
+
   } catch (error) {
     return {
       success: false,
-      messages: [`❌ Lỗi khi tạo báo cáo: ${error.toString()}`],
-      logs: [`Error in handleGetMonthlyReport: ${error.toString()}`]
+      messages: [`❌ Lỗi khi lấy dự toán: ${error.toString()}`],
+      logs: [`Error in handleGetBudget: ${error.toString()}`]
     };
   }
 }
@@ -271,7 +329,7 @@ function handleCreateBudget(intentObj, replyText) {
     
     // Generate budget analysis
     const budgetPrompt = generateBudgetAnalyticsPrompt(month, sourceMonth, replyText);
-    const budgetAnalysis = analyseDataWithOpenAI(budgetPrompt);
+    const budgetAnalysis = analyseData(budgetPrompt);
     messages.push(budgetAnalysis);
     
     return {
@@ -340,37 +398,37 @@ function handleGetFundBalance(intentObj) {
   }
 }
 
-//xử lý intent getBudget - lấy dự toán của tháng
-function handleGetBudget(intentObj) {
+//xử lý intent getMonthlyReport - lấy báo cáo tháng
+function handleGetMonthlyReport(intentObj, replyText) {
   try {
-    const { month } = intentObj;
-
-    // If no month specified, use current month
-    const targetMonth = month || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
-
-    // Use the existing getBudgetData function from sheetHandler
-    const budgetData = getBudgetData(targetMonth);
-
-    // Check if budget data was found
-    if (!budgetData || budgetData.includes("Dự toán của tháng") && budgetData.split('\n').length <= 2) {
-      return {
-        success: true,
-        messages: [intentObj.confirmation || `📊 Chưa có dự toán nào cho tháng ${targetMonth}.`],
-        logs: [`No budget entries found for month: ${targetMonth}`]
-      };
+    const { month, year } = intentObj;
+    
+    // Determine the month to analyze
+    let monthToAnalyze;
+    if (month && year) {
+      monthToAnalyze = `${month.padStart(2, '0')}/${year}`;
+    } else if (month) {
+      const currentYear = new Date().getFullYear();
+      monthToAnalyze = `${month.padStart(2, '0')}/${currentYear}`;
+    } else {
+      monthToAnalyze = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");
     }
-
+    
+    // Generate expense analytics prompt and get AI analysis
+    const expensePrompt = generateExpenseAnalyticsPrompt(replyText, monthToAnalyze, "dashboard");
+    const expenseAnalysis = analyseData(expensePrompt);
+    
     return {
       success: true,
-      messages: [budgetData],
-      logs: [`Budget retrieved for month: ${targetMonth}`]
+      messages: [expenseAnalysis],
+      logs: [`Monthly report generated for ${monthToAnalyze}`]
     };
-
+    
   } catch (error) {
     return {
       success: false,
-      messages: [`❌ Lỗi khi lấy dự toán: ${error.toString()}`],
-      logs: [`Error in handleGetBudget: ${error.toString()}`]
+      messages: [`❌ Lỗi khi tạo báo cáo: ${error.toString()}`],
+      logs: [`Error in handleGetMonthlyReport: ${error.toString()}`]
     };
   }
 }
@@ -474,64 +532,6 @@ function handleOthers(intentObj) {
       success: false,
       messages: [`❌ Lỗi khi xử lý yêu cầu: ${error.toString()}`],
       logs: [`Error in handleOthers: ${error.toString()}`]
-    };
-  }
-}
-
-//dispatcher chính để xử lý tất cả các intent
-function handleIntent(intentObj, originalText, replyText) {
-  const intent = intentObj.intent;
-
-  try {
-    switch (intent) {
-      case "addTx":
-        return handleAddTransaction(intentObj);
-
-      case "modifyTx":
-        return handleModifyTransaction(intentObj, originalText, replyText);
-
-      case "deleteTx":
-        return handleDeleteTransaction(intentObj);
-
-      case "getMonthlyReport":
-        return handleGetMonthlyReport(intentObj, replyText);
-
-      case "createBudget":
-        return handleCreateBudget(intentObj, replyText);
-
-      case "modifyBudget":
-        return handleModifyBudget(intentObj);
-
-      case "getFundBalance":
-        return handleGetFundBalance(intentObj);
-
-      case "getBudget":
-        return handleGetBudget(intentObj);
-
-      case "consult":
-        return handleConsult(intentObj, replyText);
-
-      case "affordTest":
-        // DEPRECATED: Use "consult" intent instead
-        return handleAffordTest(intentObj, replyText);
-
-      case "coaching":
-        // DEPRECATED: Use "consult" intent instead
-        return handleCoaching(intentObj, replyText);
-
-      case "search":
-        return handleSearch(intentObj);
-
-      case "others":
-      default:
-        return handleOthers(intentObj);
-    }
-
-  } catch (error) {
-    return {
-      success: false,
-      messages: [`❌ Lỗi không xác định khi xử lý intent "${intent}": ${error.toString()}`],
-      logs: [`Unexpected error in handleIntent for ${intent}: ${error.toString()}`]
     };
   }
 }

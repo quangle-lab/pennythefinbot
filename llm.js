@@ -24,7 +24,7 @@ function createOpenAIPayload(systemMessage, userMessage, temperature = 0.5, incl
 
 //--------- INTENT DETECTION --------------//
 //xác định ý định trong yêu cầu của người sử dụng
-function detectUserIntentWithOpenAI(originalText, replyText) {
+function detectUserIntent(originalText, replyText) {
   const apiKey = OPENAI_TOKEN;
 
   // Check if we need to reset conversation (new topic detection)
@@ -68,41 +68,8 @@ function detectUserIntentWithOpenAI(originalText, replyText) {
 }
 
 //--------- TRANSACTION CLASSIFICATION --------------//
-//phân loại giao dịch
-function classifyTransactionWithOpenAI(subject, body) {
-  const apiKey = OPENAI_TOKEN;
-  const props = PropertiesService.getScriptProperties();
-  const previous_response_id = props.getProperty('previous_response_id') || '';
-
-  // Sử dụng prompt builder từ promptsHandler
-  const promptData = generateClassifyTransactionPrompt(subject, body);
-  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.5, false, "gpt-4.1");
-
-  const response = UrlFetchApp.fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
-  });
-
-  try {
-    const json = JSON.parse(response.getContentText());
-    const reply = JSON.parse(json.output[0].content[0].text);
-    return reply;
-  } catch (e) {
-    return {
-      tab: '🛒 Chi phí biến đổi',
-      category: 'Khác',
-      note: 'Không phân loại được với AI',
-    };
-  }
-}
-
 //phân loại cập nhật số dư tài khoản ngân hàng
-function classifyBankBalanceWithOpenAI(subject, body) {
+function classifyBankBalance(subject, body) {
   const apiKey = OPENAI_TOKEN;
   const props = PropertiesService.getScriptProperties();
   const previous_response_id = props.getProperty('previous_response_id') || '';
@@ -141,7 +108,7 @@ function classifyBankBalanceWithOpenAI(subject, body) {
 }
 
 //xác định prompt để cải thiện phân loại giao dịch
-function detectNewContextWithOpenAI(originalTx, originalText, replyText) {
+function detectNewContext(originalTx, originalText, replyText) {
   const apiKey = OPENAI_TOKEN;
   const props = PropertiesService.getScriptProperties();
   const previous_response_id = props.getProperty('previous_response_id') || '';
@@ -177,7 +144,7 @@ function detectNewContextWithOpenAI(originalTx, originalText, replyText) {
 
 //--------- DATA ANALYSIS --------------//
 //phân tích dữ liệu (giao dịch, dự toán)
-function analyseDataWithOpenAI(promptData) {
+function analyseData(promptData) {
   const apiKey = OPENAI_TOKEN;
 
   // Create payload with conversation context
@@ -209,7 +176,6 @@ function analyseDataWithOpenAI(promptData) {
 }
 
 //--------- CONVERSATION CONTEXT --------------//
-
 //quản lý conversation context với OpenAI
 function getConversationContext() {
   const props = PropertiesService.getScriptProperties();
