@@ -644,3 +644,69 @@ function generateConsultPrompt(userQuestion, consultType = "general", intentObj)
     userMessage: consultPrompt
   };
 }
+
+//prompt phân tích ảnh hóa đơn để trích xuất thông tin giao dịch
+function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
+
+  //tạo prompt hoàn cảnh và phân loại
+  const familyContext = getFamilyContext();
+  const catInstructions = getCategoriseInstructions();
+  const catPrompt = getTxCat();
+
+  let mainPrompt = `
+  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+
+  # Identity  
+  Bạn là chuyên gia tư vấn tài chính cá nhân đang phân tích ảnh hóa đơn để trích xuất thông tin giao dịch.
+  Nhiệm vụ của bạn là phân tích ảnh hóa đơn và trích xuất thông tin giao dịch một cách chính xác.
+
+  # Ảnh hóa đơn
+  Đây là ảnh hóa đơn mà khách hàng gửi để thêm giao dịch vào hệ thống.
+  ${userMessage ? `Tin nhắn kèm theo: "${userMessage}"` : ""}
+  
+  # Instruction
+  ## Bước phân tích
+  Dựa vào ảnh hóa đơn, hãy trích xuất thông tin giao dịch:
+  - Bước 1: Xác định ngày giao dịch (nếu có trong ảnh, nếu không thì dùng ngày hiện tại)
+  - Bước 2: Xác định số tiền giao dịch
+  - Bước 3: Xác định mô tả giao dịch (tên cửa hàng, dịch vụ, sản phẩm)
+  - Bước 4: Xác định địa điểm (thành phố, khu vực nếu có thể đoán được)
+  - Bước 5: Phân loại giao dịch vào nhóm và mục phù hợp dựa trên hoàn cảnh gia đình và chỉ dẫn phân loại
+  - Bước 6: Xác định loại giao dịch (Thu hay Chi)
+
+  ## Định dạng phản hồi
+  Trả về kết quả dưới dạng JSON, không có dấu code block, không có lời giải thích:
+
+  {
+    "intent": "addTx",
+    "tab": "tên nhóm cần thêm giao dịch đúng như trong danh sách, bao gồm tên và emoji",
+    "category": "mục theo đúng tên mục như mô tả",
+    "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
+    "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
+    "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
+    "amount": "số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
+    "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
+    "comment": "từ ảnh hóa đơn"
+  }
+
+  # Hoàn cảnh gia đình khách hàng và các chỉ dẫn phân loại/dự toán cần thiết
+  ${familyContext}
+  
+  ${catInstructions}
+  
+  ${catPrompt}
+
+  `;
+
+  return {
+    systemMessage: `      
+      The current time is ${currentTime}
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.      
+      `,
+    userMessage: mainPrompt,
+    image: base64Image
+  };
+}

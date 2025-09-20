@@ -23,15 +23,45 @@ function checkTelegramMessages() {
     if (!update.message) continue;
     const msg = update.message;    
     const replyText = msg.text || "";
+    const hasPhoto = msg.photo && msg.photo.length > 0;
     const isReplyToBot = msg.reply_to_message && msg.reply_to_message.from?.username === botUsername;
     const isMentioningBot = msg.entities?.some(e =>
       e.type === "mention" &&
       replyText.substring(e.offset, e.offset + e.length).toLowerCase() === `@${botUsername.toLowerCase()}`
     );
-    if (!isReplyToBot && !isMentioningBot) continue;
+    
+    // Skip if not a reply to bot, not mentioning bot, and not a photo message
+    if (!isReplyToBot && !isMentioningBot && !hasPhoto) continue;
 
     // Get the context of the original message
     const originalText = isReplyToBot ? msg.reply_to_message.text : "";
+
+    // Handle photo messages differently
+    if (hasPhoto) {
+      try {
+        // Get the highest resolution photo
+        const photo = msg.photo[msg.photo.length - 1];
+        const fileId = photo.file_id;
+        
+        // Process the receipt photo
+        const photoResult = processReceiptPhoto(fileId, replyText);
+        
+        if (photoResult.success) {
+          sendTelegramMessage(photoResult.message);
+        } else {
+          sendTelegramMessage(`❌ Lỗi khi xử lý ảnh: ${photoResult.error}`);
+        }
+        
+        // Update last processed update ID and continue to next message
+        props.setProperty("telegram_lastUpdateId", update.update_id.toString());
+        continue;
+        
+      } catch (error) {
+        sendTelegramMessage(`❌ Lỗi khi xử lý ảnh hóa đơn: ${error.toString()}`);
+        props.setProperty("telegram_lastUpdateId", update.update_id.toString());
+        continue;
+      }
+    }
 
     // Step 1: Detect user intent using OpenAI
     const interpretation = detectUserIntent (originalText, replyText);

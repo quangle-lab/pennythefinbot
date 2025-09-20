@@ -917,13 +917,6 @@ function updateBankAccountBalance(accountNumber, newBalance, updateDate) {
 }
 
 //---------------TRANSACTION ID MANAGEMENT-------------------//
-//tạo ID duy nhất cho giao dịch
-function generateTransactionId() {
-  const timestamp = new Date().getTime();
-  const random = Math.floor(Math.random() * 1000);
-  return `TX${timestamp}${random}`;
-}
-
 //tìm dòng giao dịch theo ID
 function findTransactionRowById(sheetName, transactionId) {
   try {

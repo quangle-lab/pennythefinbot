@@ -45,6 +45,9 @@ function handleIntent(intentObj, originalText, replyText) {
       case "search":
         return handleSearch(intentObj);
 
+      case "receiptPhoto":
+        return handleReceiptPhoto(intentObj);
+
       case "others":
       default:
         return handleOthers(intentObj);
@@ -532,6 +535,45 @@ function handleOthers(intentObj) {
       success: false,
       messages: [`❌ Lỗi khi xử lý yêu cầu: ${error.toString()}`],
       logs: [`Error in handleOthers: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent receiptPhoto - xử lý ảnh hóa đơn
+function handleReceiptPhoto(intentObj) {
+  try {
+    const { fileId, userMessage } = intentObj;
+
+    if (!fileId) {
+      return {
+        success: false,
+        messages: [`❌ Thiếu thông tin ảnh để xử lý.`],
+        logs: [`Missing fileId for receipt photo processing`]
+      };
+    }
+
+    // Use the utility function to process the receipt photo
+    const result = processReceiptPhoto(fileId, userMessage);
+
+    if (!result.success) {
+      return {
+        success: false,
+        messages: [result.error],
+        logs: [`Error in receipt photo processing: ${result.error}`]
+      };
+    }
+
+    return {
+      success: true,
+      messages: [result.message],
+      logs: [`Receipt photo processed successfully: ${result.data ? JSON.stringify(result.data) : 'No data'}`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi xử lý ảnh hóa đơn: ${error.toString()}`],
+      logs: [`Error in handleReceiptPhoto: ${error.toString()}`]
     };
   }
 }

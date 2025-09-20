@@ -249,3 +249,77 @@ function resetConversationIfNeeded(forceReset = false) {
   return false;
 }
 
+//--------- RECEIPT PHOTO ANALYSIS --------------//
+//phân tích ảnh hóa đơn để trích xuất thông tin giao dịch
+function analyzeReceiptPhoto(base64Image, userMessage = "") {
+  const apiKey = OPENAI_TOKEN;
+
+  try {
+    // Generate prompt for receipt analysis
+    const promptData = generateReceiptAnalysisPrompt(base64Image, userMessage);
+
+    // Create payload for OpenAI Vision API
+    const payload = {
+      model: "gpt-4.1",
+      input: [
+        {
+          role: "system",
+          content: promptData.systemMessage
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: promptData.userMessage
+            },
+            {
+              type: "input_image",
+              image_url: `data:image/jpeg;base64,${base64Image}`
+            },            
+          ]
+        }
+      ],
+      temperature: 0.3      
+    };
+
+    const options = {
+      method: "POST",
+      contentType: "application/json",
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
+    const json = JSON.parse(response.getContentText());
+
+    if (!json.output || !json.output[0] || !json.output[0].content) {
+      throw new Error("Invalid response from OpenAI Vision API");
+    }
+
+    const content = json.output[0].content[0].text;
+    Logger.log("Receipt analysis response: " + content);
+
+    // Update conversation context
+    updateConversationContext(json.id, 'receipt_analysis');
+
+    // Parse the JSON response
+    const transactionData = JSON.parse(content);
+
+    return {
+      success: true,
+      data: transactionData
+    };
+
+  } catch (error) {
+    Logger.log(`Error in analyzeReceiptPhoto: ${error.toString()}`);
+    return {
+      success: false,
+      error: `Lỗi khi phân tích ảnh hóa đơn: ${error.toString()}`
+    };
+  }
+}
+
