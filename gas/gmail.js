@@ -78,12 +78,12 @@ function processBankAlerts() {
 
         const checkResult = checkAndConfirmTransaction(tx);
         if (checkResult.exists) {
-          //gửi thông báo Telegram để xác nhận
-          sendTelegramMessage (checkResult.message);
+          //gửi thông báo Telegram để xác nhận với buttons
+          sendTelegramMessage (checkResult.message, checkResult.replyMarkup);
         } else {
           //thêm mới giao dịch
           const addResult = addConfirmedTransaction(groupTx, tx);      
-          sendTelegramMessage (addResult.message);  
+          sendTelegramMessage (addResult.message, addResult.replyMarkup);  
           if (!addResult.success) {
             sendTelegramMessage (addResult.error);
             continue;

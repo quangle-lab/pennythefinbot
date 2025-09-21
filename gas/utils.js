@@ -159,3 +159,119 @@ function processReceiptPhoto(fileId, userMessage = "") {
     };
   }
 }
+
+//--------- TELEGRAM BUTTON UTILITIES --------------//
+
+/**
+ * Create a delete button for a transaction
+ * @param {string} transactionId - The transaction ID
+ * @param {string} sheetName - The sheet name where the transaction is stored
+ * @returns {Object} Telegram inline keyboard button object
+ */
+function createDeleteButton(transactionId, sheetName) {
+  return {
+    text: "🗑️Xóa",
+    callback_data: `delete_${transactionId}_${sheetName}`
+  };
+}
+
+/**
+ * Parse callback data from Telegram button clicks
+ * @param {string} callbackData - The callback data from the button click
+ * @returns {Object} Parsed data with action, transactionId, sheetName, and transactionData
+ */
+function parseCallbackData(callbackData) {
+  try {
+    const parts = callbackData.split('_');
+    
+    if (parts.length >= 3 && parts[0] === 'delete') {
+      return {
+        action: 'delete',
+        transactionId: parts[1],
+        sheetName: parts.slice(2).join('_'), // Handle sheet names with underscores
+        transactionData: null,
+        existingRows: null
+      };
+    } else if (parts.length >= 2 && parts[0] === 'keep') {
+      return {
+        action: 'keep',
+        transactionId: parts[1],
+        sheetName: null,
+        transactionData: null,
+        existingRows: null
+      };
+    } else if (parts.length >= 4 && parts[0] === 'del' && parts[1] === 'existing') {
+      return {
+        action: 'delete_existing',
+        transactionId: parts[2],
+        sheetName: parts[3],
+        transactionData: null,
+        existingRows: parts.slice(4).join('_') // Handle multiple row numbers
+      };
+    }
+    
+    return {
+      action: 'unknown',
+      transactionId: null,
+      sheetName: null,
+      transactionData: null
+    };
+  } catch (error) {
+    Logger.log(`Error parsing callback data: ${error.toString()}`);
+    return {
+      action: 'error',
+      transactionId: null,
+      sheetName: null,
+      transactionData: null
+    };
+  }
+}
+
+/**
+ * Format inline keyboard for Telegram API
+ * @param {Array} buttons - Array of button objects
+ * @returns {Object} Telegram inline keyboard markup object
+ */
+function formatInlineKeyboard(buttons) {
+  return {
+    inline_keyboard: [buttons]
+  };
+}
+
+/**
+ * Create a single-row inline keyboard with delete button
+ * @param {string} transactionId - The transaction ID
+ * @param {string} sheetName - The sheet name
+ * @returns {Object} Telegram inline keyboard markup object
+ */
+function createDeleteKeyboard(transactionId, sheetName) {
+  const deleteButton = createDeleteButton(transactionId, sheetName);
+  return formatInlineKeyboard([deleteButton]);
+}
+
+/**
+ * Create a keep transaction button for keeping the new transaction
+ * @param {string} transactionId - The transaction ID
+ * @returns {Object} Telegram inline keyboard button object
+ */
+function createKeepButton(transactionId) {
+  return {
+    text: "✅Giữ",
+    callback_data: `keep_${transactionId}`
+  };
+}
+
+/**
+ * Create a confirmation keyboard with Delete Existing and Keep buttons
+ * @param {string} transactionId - The new transaction ID
+ * @param {string} sheetName - The sheet name
+ * @param {string} existingRows - Comma-separated existing row numbers
+ * @returns {Object} Telegram inline keyboard markup object
+ */
+function createDuplicateConfirmationKeyboard(transactionId, sheetName) {
+  const deleteExistingButton = createDeleteButton(transactionId, sheetName);
+  const keepButton = createKeepButton(transactionId);
+  return {
+    inline_keyboard: [[deleteExistingButton, keepButton]]
+  };
+}

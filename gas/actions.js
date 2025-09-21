@@ -92,7 +92,8 @@ function handleAddTransaction(intentObj) {
       return {
         success: true,
         messages: [result.message],
-        logs: [result.message]
+        logs: [result.message],
+        replyMarkup: result.replyMarkup
       };
     }
 

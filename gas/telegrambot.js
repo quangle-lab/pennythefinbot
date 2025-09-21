@@ -18,8 +18,24 @@ function checkTelegramMessages() {
 
   //const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
-  //for each message 
+  //for each update (messages and callback queries)
   for (const update of updates) {
+    // Handle callback queries from inline keyboard buttons
+    if (update.callback_query) {
+      try {
+        handleCallbackQuery(update.callback_query);
+        // Update last processed update ID
+        props.setProperty("telegram_lastUpdateId", update.update_id.toString());
+        continue;
+      } catch (error) {
+        Logger.log(`Error handling callback query: ${error.toString()}`);
+        // Still update the last processed ID to avoid reprocessing
+        props.setProperty("telegram_lastUpdateId", update.update_id.toString());
+        continue;
+      }
+    }
+    
+    // Handle regular messages
     if (!update.message) continue;
     const msg = update.message;    
     const replyText = msg.text || "";
@@ -76,6 +92,7 @@ function checkTelegramMessages() {
     let allMessages = [];
     let allLogs = [];
     let hasError = false;
+    let replyMarkup = null;
 
     // Step 2: Process each intent through actionHandler
     intents.forEach((intentObj, index) => {
@@ -103,6 +120,11 @@ function checkTelegramMessages() {
           allLogs = allLogs.concat(actionResult.logs);
         }
 
+        // Collect reply markup if available
+        if (actionResult.replyMarkup) {
+          replyMarkup = actionResult.replyMarkup;
+        }
+
         // Log any errors
         if (!actionResult.success) {
           Logger.log(`Action failed for intent ${intentObj.intent}: ${actionResult.messages.join(', ')}`);
@@ -119,7 +141,7 @@ function checkTelegramMessages() {
     // Step 4: Send messages and logs
     if (allMessages.length > 0) {
       const finalMessage = allMessages.join("\n\n");
-      sendTelegramMessage(finalMessage);
+      sendTelegramMessage(finalMessage, replyMarkup);
     }
 
     if (allLogs.length > 0) {
@@ -133,7 +155,7 @@ function checkTelegramMessages() {
 }
 
 //send message to Telegram
-function sendTelegramMessage (message) {
+function sendTelegramMessage (message, replyMarkup = null) {
   const props = PropertiesService.getScriptProperties();
   const debugChannel = props.getProperty("telegram_DebugChat") || '-4847069897';
   const debugMode = props.getProperty("debug_Mode") || 'off';
@@ -144,11 +166,21 @@ function sendTelegramMessage (message) {
       parse_mode: `Markdown`,
       text: message,
   }
+  
+  // Add reply markup if provided
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
+  }
+  
   if (debugMode === 'on') {
     payload = {
       chat_id: debugChannel,
       parse_mode: `Markdown`,
       text: message,
+    }
+    // Add reply markup for debug mode too
+    if (replyMarkup) {
+      payload.reply_markup = replyMarkup;
     }
   }
 
@@ -212,6 +244,123 @@ function initMonthlyBudget () {
   let budgetAnlyticsResp = analyseDataWithOpenAI (budgetPrompt);
   
   sendTelegramMessage (budgetAnlyticsResp);
+}
+
+//handle callback queries from inline keyboard buttons
+function handleCallbackQuery(callbackQuery) {
+  try {
+    const { id, data, message } = callbackQuery;
+    const chatId = message.chat.id;
+    const messageId = message.message_id;
+    
+    Logger.log(`Callback query received: ${data}`);
+    
+    // Parse the callback data
+    const parsedData = parseCallbackData(data);
+    
+    if (parsedData.action === 'delete') {
+      // Handle delete transaction
+      const deleteResult = deleteTransactionById(parsedData.sheetName, parsedData.transactionId);
+      
+      if (deleteResult.success) {
+        // Update the original message to show deletion confirmation
+        const updatedMessage = `_${message.text}_\n🗑️*Đã xóa giao dịch*`;
+        
+        // Edit the original message
+        editTelegramMessage(chatId, messageId, updatedMessage);
+        
+        // Answer the callback query
+        answerCallbackQuery(id, "✅ Giao dịch đã được xóa");
+        
+        Logger.log(`Transaction deleted successfully: ${parsedData.transactionId}`);
+      } else {
+        // Handle deletion error
+        answerCallbackQuery(id, `❌ Lỗi: ${deleteResult.error}`);
+        Logger.log(`Failed to delete transaction: ${deleteResult.error}`);
+      }
+    } else if (parsedData.action === 'keep') {
+      // Handle keep transaction (skip action)
+      try {
+        // Update the original message to show keep confirmation
+        const updatedMessage = `_${message.text}_\n✅*Giữ giao dịch*`;
+        
+        // Edit the original message
+        editTelegramMessage(chatId, messageId, updatedMessage);
+        
+        // Answer the callback query
+        answerCallbackQuery(id, "✅ Đã giữ giao dịch");
+        
+        Logger.log(`Transaction kept: ${parsedData.transactionId}`);
+      } catch (error) {
+        answerCallbackQuery(id, "❌ Lỗi khi giữ giao dịch");
+        Logger.log(`Error keeping transaction: ${error.toString()}`);
+      }
+    } else {
+      // Unknown callback data
+      answerCallbackQuery(id, "❌ Lệnh không được hỗ trợ");
+      Logger.log(`Unknown callback data: ${data}`);
+    }
+    
+  } catch (error) {
+    Logger.log(`Error handling callback query: ${error.toString()}`);
+    // Try to answer the callback query with error message
+    try {
+      answerCallbackQuery(callbackQuery.id, "❌ Đã xảy ra lỗi khi xử lý yêu cầu");
+    } catch (answerError) {
+      Logger.log(`Failed to answer callback query: ${answerError.toString()}`);
+    }
+  }
+}
+
+//edit a Telegram message
+function editTelegramMessage(chatId, messageId, newText) {
+  try {
+    const payload = {
+      chat_id: chatId,
+      message_id: messageId,
+      text: newText,
+      parse_mode: "Markdown"
+    };
+
+    const response = UrlFetchApp.fetch(`${TELEGRAM_API_URL}/editMessageText`, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    Logger.log(`Edit message response: ${response.getContentText()}`);
+    return response;
+    
+  } catch (error) {
+    Logger.log(`Error editing message: ${error.toString()}`);
+    throw error;
+  }
+}
+
+//answer a callback query
+function answerCallbackQuery(callbackQueryId, text, showAlert = false) {
+  try {
+    const payload = {
+      callback_query_id: callbackQueryId,
+      text: text,
+      show_alert: showAlert
+    };
+
+    const response = UrlFetchApp.fetch(`${TELEGRAM_API_URL}/answerCallbackQuery`, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    Logger.log(`Answer callback query response: ${response.getContentText()}`);
+    return response;
+    
+  } catch (error) {
+    Logger.log(`Error answering callback query: ${error.toString()}`);
+    throw error;
+  }
 }
 
 

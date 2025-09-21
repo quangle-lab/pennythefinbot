@@ -364,14 +364,41 @@ function checkAndConfirmTransaction(transaction) {
     }
   }
 
+  // Prepare transaction data
+  const transactionData = {
+    type: transaction.type || '💸Chi',
+    date: Utilities.formatDate(inputDate, timezone, "dd/MM/yyyy"),
+    description: description,
+    amount: amount,
+    location: transaction.location || 'N/A',
+    category: category || 'Khác',
+    bankComment: bankComment || ''
+  };
+
+  // Always add the transaction first
+  const addResult = addConfirmedTransaction(group, transactionData);
+  
+  if (!addResult.success) {
+    return {
+      exists: false,
+      needsConfirmation: false,
+      error: addResult.error
+    };
+  }
+
   // Return results
   if (existingRows.length > 0) {
-    let message = `🔍 Tìm thấy *${existingRows.length}* giao dịch tương tự trong *${group}*:\n\n`;
+    // Create message with existing row information
+    let message = addResult.message;
+    message += `\n\n🔍 *Tìm thấy ${existingRows.length} giao dịch tương tự:*\n`;
     existingRows.forEach((row, index) => {
-      message += `- *Dòng ${row.rowNumber}*: ${row.date} - ${row.description} - €${row.amount} - ${row.category}\n`;
+      message += `- *Dòng ${row.rowNumber}*: ${row.date} - ${row.description} - €${row.amount}\n`;
     });
-    message += `\n*📝Giao dịch mới*: ${Utilities.formatDate(inputDate, timezone, "dd/MM/yyyy")} - ${description} - ${amount} - ${category || 'N/A'}\n\n`;
-    message += `❓Bạn có muốn thêm giao dịch này không?`;
+    message += `\n❓Bạn có muốn giữ giao dịch mới này không?`;
+
+    // Create buttons with simple callback data (transaction ID and existing row numbers)
+    const existingRowNumbers = existingRows.map(row => row.rowNumber).join(',');
+    const confirmationKeyboard = createDuplicateConfirmationKeyboard(addResult.transactionId, group, existingRowNumbers);
 
     return {
       exists: true,
@@ -379,29 +406,17 @@ function checkAndConfirmTransaction(transaction) {
       existingRows: existingRows,
       message: message,
       group: group,
-      newTransaction: {
-        date: inputDate,
-        description: description,
-        amount: amount,
-        location: transaction.location || 'N/A',
-        category: category || 'Khác',
-        bankComment: bankComment || ''
-      }
+      transactionId: addResult.transactionId,
+      replyMarkup: confirmationKeyboard
     };
   } else {
     return {
       exists: false,
-      needsConfirmation: true,
-      message: `🔍 Không tìm thấy giao dịch tương tự trong "${group}".\n`,
+      needsConfirmation: false,
+      message: addResult.message,
       group: group,
-      newTransaction: {
-        date: inputDate,
-        description: description,
-        amount: amount,
-        location: transaction.location || 'N/A',
-        category: category || 'Khác',
-        bankComment: bankComment || ''
-      }
+      transactionId: addResult.transactionId,
+      replyMarkup: addResult.replyMarkup
     };
   }
 }
@@ -444,8 +459,7 @@ function addConfirmedTransaction(sheetName, transactionData) {
     
     if (remainingData.success) {
       const remaining = remainingData.remaining;
-      const budget = remainingData.budget;
-      const actual = remainingData.actual;
+      const budget = remainingData.budget;      
       
       if (budget > 0) {
         if (remaining >= 0) {
@@ -456,12 +470,16 @@ function addConfirmedTransaction(sheetName, transactionData) {
       }
     }
 
+    // Create delete button for the transaction
+    const deleteKeyboard = createDeleteKeyboard(transactionId, sheetName);
+    
     return {
       success: true,
-      message: `${type} *${amount}* cho *${description}*\n ✏️_Ghi vào ${sheetName}, mục ${category}, ${remainingMessage}_\n_(ID: ${transactionId})_`,
+      message: `${type} *${amount}* cho *${description}*\n _✏️${sheetName}, mục ${category}, ${remainingMessage}_\n_(ID: ${transactionId})_`,
       rowNumber: newRowNumber,
       sheetName: sheetName,
-      transactionId: transactionId
+      transactionId: transactionId,
+      replyMarkup: deleteKeyboard
     };
 
   } catch (error) {
@@ -474,7 +492,7 @@ function addConfirmedTransaction(sheetName, transactionData) {
 
 
 //---------------BALANCES MANAGEMENT-------------------//
-//tính số tiền còn lại cho một mục cụ thể trong một nhóm
+//tính dự toán còn lại cho một mục cụ thể trong một nhóm
 function getCategoryRemainingAmount(group, category) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
