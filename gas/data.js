@@ -318,7 +318,6 @@ function checkAndConfirmTransaction(transaction) {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const rowDate = row[0]; // Column A: Date
-    const rowDesc = row[1]; // Column B: Description
     const rowAmount = row[2]; // Column C: Amount
     const rowLocation = row[3]; // Column D: Location
     const rowCategory = row[4]; // Column E: Category
@@ -334,9 +333,6 @@ function checkAndConfirmTransaction(transaction) {
       // Check for potential duplicates based on multiple criteria
       const dateMatch = rowDateFormatted === inputDateFormatted;
       const amountMatch = Math.abs(parseFloat(rowAmount) - parseFloat(amount)) < 0.01; // Allow small floating point differences
-      const descMatch = rowDesc && description &&
-        (rowDesc.toLowerCase().includes(description.toLowerCase()) ||
-         description.toLowerCase().includes(rowDesc.toLowerCase()));
       const bankCommentMatch = bankComment && rowBankComment &&
         (rowBankComment.toLowerCase().includes(bankComment.toLowerCase()) ||
          bankComment.toLowerCase().includes(rowBankComment.toLowerCase()));
@@ -346,7 +342,6 @@ function checkAndConfirmTransaction(transaction) {
       // 2. Same date AND similar description, OR
       // 3. Same amount AND same bank comment (if available)
       if ((dateMatch && amountMatch) ||
-          (dateMatch && descMatch) ||
           (amountMatch && bankCommentMatch)) {
         existingRows.push({
           rowNumber: i + 1,

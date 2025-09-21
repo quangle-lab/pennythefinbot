@@ -275,3 +275,91 @@ function createDuplicateConfirmationKeyboard(transactionId, sheetName) {
     inline_keyboard: [[deleteExistingButton, keepButton]]
   };
 }
+
+//--------- TRIGGER MANAGEMENT --------------//
+
+/**
+ * Create all required triggers for the Penny Finance Bot
+ * This function creates triggers for automated tasks
+ */
+function createTriggers() {
+  try {
+    // Delete existing triggers first to avoid duplicates
+    deleteAllTriggers();
+    
+    // Trigger 1: Check Telegram messages every minute
+    ScriptApp.newTrigger('checkTelegramMessages')
+      .timeBased()
+      .everyMinutes(1)
+      .create();
+    
+    // Trigger 2: Process bank alerts every 10 minutes
+    ScriptApp.newTrigger('processBankAlerts')
+      .timeBased()
+      .everyMinutes(10)
+      .create();
+    
+    // Trigger 3: Send weekly report every Saturday at 8:00 AM
+    ScriptApp.newTrigger('sendWeeklyReport')
+      .timeBased()
+      .everyWeeks(1)
+      .onWeekDay(ScriptApp.WeekDay.SATURDAY)
+      .atHour(8)
+      .create();
+    
+    // Trigger 4: Initialize monthly budget on the 28th at 8:00 AM
+    ScriptApp.newTrigger('initMonthlyBudget')
+      .timeBased()      
+      .onMonthDay(28)
+      .atHour(8)
+      .create();
+    
+    Logger.log('All triggers created successfully');
+    return {
+      success: true,
+      message: 'All triggers created successfully'
+    };
+    
+  } catch (error) {
+    Logger.log(`Error creating triggers: ${error.toString()}`);
+    return {
+      success: false,
+      error: `Failed to create triggers: ${error.toString()}`
+    };
+  }
+}
+
+/**
+ * Delete all existing triggers to avoid duplicates
+ */
+function deleteAllTriggers() {
+  try {
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(trigger => {
+      ScriptApp.deleteTrigger(trigger);
+    });
+    Logger.log(`Deleted ${triggers.length} existing triggers`);
+  } catch (error) {
+    Logger.log(`Error deleting triggers: ${error.toString()}`);
+  }
+}
+
+/**
+ * List all current triggers for debugging
+ */
+function listTriggers() {
+  try {
+    const triggers = ScriptApp.getProjectTriggers();
+    const triggerList = triggers.map(trigger => ({
+      functionName: trigger.getHandlerFunction(),
+      triggerSource: trigger.getTriggerSource(),
+      eventType: trigger.getEventType()
+    }));
+    
+    Logger.log('Current triggers:', triggerList);
+    return triggerList;
+  } catch (error) {
+    Logger.log(`Error listing triggers: ${error.toString()}`);
+    return [];
+  }
+}
