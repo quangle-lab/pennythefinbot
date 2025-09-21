@@ -94,7 +94,7 @@ function createBudgetSelectively(newMonthText, sourceMonthText) {
   }
 
   // Step 4: Generate summary message
-  let summary = `✅ **Tạo dự toán tháng ${newMonthText}:**\n\n`;
+  let summary = `✅ *Tạo dự toán tháng ${newMonthText}*\:\n\n`;
 
   if (createdCount > 0) {
     summary += `➕ Đã tạo ${createdCount} dự toán mới từ tháng ${sourceMonthText}\n`;
@@ -107,7 +107,7 @@ function createBudgetSelectively(newMonthText, sourceMonthText) {
     });
 
     Object.keys(groupedNewItems).forEach(group => {
-      summary += `\n**${group}:**\n${groupedNewItems[group].join('\n')}`;
+      summary += `\n*${group}*\:\n${groupedNewItems[group].join('\n')}`;
     });
   } else {
     summary += `ℹ️ Không có dự toán mới nào được tạo (tất cả đã tồn tại)`;
@@ -150,13 +150,13 @@ function setBudgetChange(month, group, category, amount, note) {
     if (rowMonth === month && groupCell === group && categoryCell === category) {
       sheet.getRange(i + 1, 4).setValue(amount);  // Column D = amount
       sheet.getRange(i + 1, 5).setValue(note);    // Column E = ghi chú
-      return `✅ Đã cập nhật dự toán tháng ${rowMonth} cho *${category}* (${group}): €${amount}`; // Stop after first match
+      return `✅ Đã cập nhật dự toán tháng ${rowMonth} cho *${category}* \(${group}\)\: €${amount}`; // Stop after first match
     }
   }
 
   // Nếu chưa có, thêm mới  
   sheet.appendRow([month, group, category, amount, note]);
-  return `➕ Đã thêm dự toán tháng ${month} cho *${category}* (${group}): €${amount}`;
+  return `➕ Đã thêm dự toán tháng ${month} cho *${category}* \(${group}\)\: €${amount}`;
 }
 
 //helper function để format số với dấu phân cách hàng nghìn
@@ -385,9 +385,9 @@ function checkAndConfirmTransaction(transaction) {
   if (existingRows.length > 0) {
     // Create message with existing row information
     let message = addResult.message;
-    message += `\n\n🔍 *Tìm thấy ${existingRows.length} giao dịch tương tự:*\n`;
+    message += `\n\n🔍 *Tìm thấy ${existingRows.length} giao dịch tương tự*\:\n`;
     existingRows.forEach((row, index) => {
-      message += `- *Dòng ${row.rowNumber}*: ${row.date} - ${row.description} - €${row.amount}\n`;
+      message += `\- *Dòng ${row.rowNumber}*\: ${row.date} \- ${row.description} \- €${row.amount}\n`;
     });
     message += `\n❓Bạn có muốn giữ giao dịch mới này không?`;
 
@@ -470,7 +470,7 @@ function addConfirmedTransaction(sheetName, transactionData) {
     
     return {
       success: true,
-      message: `${type} *${amount}* cho *${description}*\n _✏️${sheetName}, mục ${category}, ${remainingMessage}_\n_(ID: ${transactionId})_`,
+      message: `${type} *${amount}* cho *${description}*\n _✏️${sheetName}, mục ${category}, ${remainingMessage}_\n_\(ID\: ${transactionId}\)_`,
       rowNumber: newRowNumber,
       sheetName: sheetName,
       transactionId: transactionId,
@@ -672,7 +672,7 @@ function formatFundBalances(balanceData) {
 
   if (balanceData.type === "all") {
     let message = "💰*Tổng quan số dư các quỹ*\n";
-    message += "-" .repeat(15) + "\n";
+    message += "\-" .repeat(15) + "\n";
 
     const fundNames = {
       "rainy": "🛟Quỹ Gia Đình",
@@ -690,13 +690,13 @@ function formatFundBalances(balanceData) {
         Object.entries(fund.items).forEach(([name, amount]) => {
           message += `  • ${name}: €${amount.toFixed(2)}\n`;
         });
-        message += `  **Tổng: €${fund.total.toFixed(2)}**\n\n`;
+        message += `  *Tổng\: €${fund.total.toFixed(2)}*\n\n`;
       } else {
         message += `  _Không có dữ liệu_\n\n`;
       }
     });
 
-    message += `🏦 **Tổng cộng tất cả quỹ: €${balanceData.grandTotal.toFixed(2)}**`;
+    message += `🏦 *Tổng cộng tất cả quỹ\: €${balanceData.grandTotal.toFixed(2)}*`;
     return message;
 
   } else {
@@ -709,13 +709,13 @@ function formatFundBalances(balanceData) {
 
     const fundName = fundNames[balanceData.type] || balanceData.type;
     let message = `💰*${fundName}*\n`;
-    message += "-" .repeat(15) + "\n";
+    message += "\-" .repeat(15) + "\n";
 
     if (Object.keys(balanceData.balances).length > 0) {
       Object.entries(balanceData.balances).forEach(([name, amount]) => {
         message += `• ${name}: €${amount.toFixed(2)}\n`;
       });
-      message += `\n**Tổng: €${balanceData.total.toFixed(2)}**`;
+      message += `\n*Tổng\: €${balanceData.total.toFixed(2)}*`;
     } else {
       message += "_Không có dữ liệu_";
     }
@@ -800,7 +800,7 @@ function formatBankAccountBalances(balanceData) {
   }
 
   let message = "🏦*Số dư tài khoản ngân hàng*\n";
-  message += "-" .repeat(15) + "\n";
+  message += "\-" .repeat(15) + "\n";
 
   if (balanceData.bankBalances.length === 0) {
     message += "_Không có dữ liệu số dư tài khoản ngân hàng_\n";
@@ -1401,8 +1401,8 @@ function formatSearchResults(searchData) {
   const { results, totalMatches, searchParams } = searchData;
   const timezone = Session.getScriptTimeZone();
 
-  let message = `🔍 **Kết quả tìm kiếm** (${totalMatches} giao dịch)\n`;
-  message += "=" .repeat(15) + "\n\n";
+  let message = `🔍 *Kết quả tìm kiếm* \(${totalMatches} giao dịch\)\n`;
+  message += "\=" .repeat(15) + "\n\n";
 
   // Add search criteria summary
   if (searchParams.startDate || searchParams.endDate) {
@@ -1425,15 +1425,15 @@ function formatSearchResults(searchData) {
   }
 
   if (searchParams.keywords && searchParams.keywords.length > 0) {
-    message += `🔎 **Từ khóa**: "${searchParams.keywords.join(', ')}"\n`;
+    message += `🔎 *Từ khóa*\: "${searchParams.keywords.join(', ')}"\n`;
   }
 
-  message += "\n" + "=" .repeat(15) + "\n\n";
+  message += "\n" + "\=" .repeat(15) + "\n\n";
 
   // Format results by group > category > date
   results.forEach(groupResult => {
-    message += `**${groupResult.groupName}**\n`;
-    message += "-" .repeat(15) + "\n";
+    message += `*${groupResult.groupName}*\n`;
+    message += "\-" .repeat(15) + "\n";
 
     // Group transactions by category
     const categorizedTx = {};
@@ -1462,11 +1462,11 @@ function formatSearchResults(searchData) {
         try {
           const formattedDate = Utilities.formatDate(new Date(tx.date), timezone, "dd/MM");
           const amount = typeof tx.amount === 'number' ? tx.amount.toFixed(2) : tx.amount;
-          message += `  • *${formattedDate}*: ${tx.description} - *€${amount}*\n`;
+          message += `  • *${formattedDate}*\: ${tx.description} \- *€${amount}*\n`;
         } catch (e) {
           // Fallback for invalid dates
           const amount = typeof tx.amount === 'number' ? tx.amount.toFixed(2) : tx.amount;
-          message += `  • ${tx.date}: ${tx.description} - €${amount}\n`;
+          message += `  • ${tx.date}\: ${tx.description} \- €${amount}\n`;
         }
       });
     });

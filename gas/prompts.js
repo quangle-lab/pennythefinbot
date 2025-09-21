@@ -382,9 +382,13 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
         - Ngôn ngữ: mặc định tiếng Việt. Nếu khách hàng hỏi bằng ngôn ngữ khác (e.g. what is the breakdown for fix expense this month?), hãy trả lời bằng cùng ngôn ngữ với khách hàng.
         - Dùng đúng tên mục trong báo cáo tài chính
         - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng  
-        - Dùng định dạng markdown cho Telegram, không có dấu code block
+        - Dùng định dạng MarkdownV2 cho Telegram, không có dấu code block
             *bold text*
             _italic text_
+            __underline text__
+            ~strikethrough text~
+            ||spoiler text||
+            \`inline code\`
             [inline URL](http://www.example.com/)
             [inline mention of a user](tg://user?id=123456789)   
 
@@ -524,9 +528,13 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText, replyText) 
       - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng 
       - Dùng dấu ✅ để ghi nhận chênh lệch tốt và ⚠️ để ghi nhận chênh lệch xấu
       - Cho phần dự toán, nó rõ là đề nghị để khách hàng cân nhắc và thêm call to action để khách hàng trả lời lại tin nhắn nếu cần thay đổi dự toán
-      - Dùng định dạng markdown cho Telegram, không có dấu code block
+      - Dùng định dạng MarkdownV2 cho Telegram, không có dấu code block
             *bold text*
             _italic text_
+            __underline text__
+            ~strikethrough text~
+            ||spoiler text||
+            \`inline code\`
             [inline URL](http://www.example.com/)
             [inline mention of a user](tg://user?id=123456789)       
 
@@ -630,9 +638,13 @@ function generateConsultPrompt(userQuestion, consultType = "general", intentObj)
     - Use Vietnamese language
     - Be friendly but professional
     - Use appropriate emojis
-    - Use Telegram markdown format (no code blocks)
+    - Use Telegram MarkdownV2 format (no code blocks)
         *bold text*
         _italic text_
+        __underline text__
+        ~strikethrough text~
+        ||spoiler text||
+        \`inline code\`
         [inline URL](http://www.example.com/)      
     - Limit to 400 words maximum
     - Focus on practical, actionable advice

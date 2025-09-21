@@ -163,8 +163,8 @@ function sendTelegramMessage (message, replyMarkup = null) {
   var payload = {
       chat_id: CHAT_ID,
       message_thread_id: THREAD_ID,   
-      parse_mode: `Markdown`,
-      text: message,
+      parse_mode: `MarkdownV2`,
+      text: convertToMarkdownV2(message),
   }
   
   // Add reply markup if provided
@@ -175,8 +175,8 @@ function sendTelegramMessage (message, replyMarkup = null) {
   if (debugMode === 'on') {
     payload = {
       chat_id: debugChannel,
-      parse_mode: `Markdown`,
-      text: message,
+      parse_mode: `MarkdownV2`,
+      text: convertToMarkdownV2(message),
     }
     // Add reply markup for debug mode too
     if (replyMarkup) {
@@ -202,7 +202,7 @@ function sendLog (message) {
   const logChannel = props.getProperty("telegram_logsChat") || '-4826732207';
   const payload = {    
     chat_id: logChannel,
-    parse_mode: `Markdown`,
+    parse_mode: `MarkdownV2`,
     text: message,
   };
   var response = UrlFetchApp.fetch(`${TELEGRAM_API_URL}/sendMessage`, {
@@ -264,7 +264,7 @@ function handleCallbackQuery(callbackQuery) {
       
       if (deleteResult.success) {
         // Update the original message to show deletion confirmation
-        const updatedMessage = `_${message.text}_\n🗑️*Đã xóa giao dịch*`;
+        const updatedMessage = `\~${convertToMarkdownV2(message.text)}\~\n🗑️*Đã xóa giao dịch*`;
         
         // Edit the original message
         editTelegramMessage(chatId, messageId, updatedMessage);
@@ -282,7 +282,7 @@ function handleCallbackQuery(callbackQuery) {
       // Handle keep transaction (skip action)
       try {
         // Update the original message to show keep confirmation
-        const updatedMessage = `_${message.text}_\n✅*Giữ giao dịch*`;
+        const updatedMessage = `_${convertToMarkdownV2(message.text)}_\n✅*Giữ giao dịch*`;
         
         // Edit the original message
         editTelegramMessage(chatId, messageId, updatedMessage);
@@ -319,7 +319,7 @@ function editTelegramMessage(chatId, messageId, newText) {
       chat_id: chatId,
       message_id: messageId,
       text: newText,
-      parse_mode: "Markdown"
+      parse_mode: "MarkdownV2"
     };
 
     const response = UrlFetchApp.fetch(`${TELEGRAM_API_URL}/editMessageText`, {

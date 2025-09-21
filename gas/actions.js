@@ -154,7 +154,7 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
         };
       }
 
-      confirmation = `✅ ${intentObj.confirmation}\n_(ID: ${transactionId})_`
+      confirmation = `✅ ${intentObj.confirmation}\n_\(ID\: ${transactionId}\)_`
     } else {
       // Move to different sheet
       const newSheet = ss.getSheetByName(newtab);
@@ -190,7 +190,7 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
         };
       }
 
-      confirmation = `✅ ${intentObj.confirmation}\n_(ID mới: ${newTransactionId})_`
+      confirmation = `✅ ${intentObj.confirmation}\n_\(ID mới\: ${newTransactionId}\)_`
     }
 
     // Detect new context for learning
@@ -249,7 +249,7 @@ function handleDeleteTransaction(intentObj) {
       };
     }
 
-    const message = intentObj.confirmation || `🗑️ Đã xoá giao dịch ID: ${transactionId}`;
+    const message = intentObj.confirmation || `🗑️ Đã xoá giao dịch ID\: ${transactionId}`;
 
     return {
       success: true,
@@ -323,9 +323,9 @@ function handleCreateBudget(intentObj, replyText) {
     
     // If there are existing budget lines, show them and ask for modification
     if (creationResult.existingLines && creationResult.existingLines.length > 0) {
-      let existingMessage = "\n📋 **Các dự toán đã tồn tại:**\n\n";
+      let existingMessage = "\n📋 *Các dự toán đã tồn tại*\:\n\n";
       creationResult.existingLines.forEach((line, index) => {
-        existingMessage += `${index + 1}. **${line.group}** / ${line.category} / €${line.amount}\n`;
+        existingMessage += `${index + 1}\. *${line.group}* / ${line.category} / €${line.amount}\n`;
       });
       existingMessage += "\n💬 Trả lời tin nhắn này nếu bạn muốn chỉnh sửa các dự toán đã tồn tại.";
       messages.push(existingMessage);

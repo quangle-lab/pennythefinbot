@@ -176,6 +176,18 @@ function createDeleteButton(transactionId, sheetName) {
 }
 
 /**
+ * Create a keep transaction button for keeping the new transaction
+ * @param {string} transactionId - The transaction ID
+ * @returns {Object} Telegram inline keyboard button object
+ */
+function createKeepButton(transactionId) {
+  return {
+    text: "✅Giữ",
+    callback_data: `keep_${transactionId}`
+  };
+}
+
+/**
  * Parse callback data from Telegram button clicks
  * @param {string} callbackData - The callback data from the button click
  * @returns {Object} Parsed data with action, transactionId, sheetName, and transactionData
@@ -250,18 +262,6 @@ function createDeleteKeyboard(transactionId, sheetName) {
 }
 
 /**
- * Create a keep transaction button for keeping the new transaction
- * @param {string} transactionId - The transaction ID
- * @returns {Object} Telegram inline keyboard button object
- */
-function createKeepButton(transactionId) {
-  return {
-    text: "✅Giữ",
-    callback_data: `keep_${transactionId}`
-  };
-}
-
-/**
  * Create a confirmation keyboard with Delete Existing and Keep buttons
  * @param {string} transactionId - The new transaction ID
  * @param {string} sheetName - The sheet name
@@ -274,6 +274,229 @@ function createDuplicateConfirmationKeyboard(transactionId, sheetName) {
   return {
     inline_keyboard: [[deleteExistingButton, keepButton]]
   };
+}
+
+//--------- MARKDOWN V2 FORMATTING --------------//
+function escapeRegex(char) {
+  return char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Escape special characters for Telegram MarkdownV2
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeMarkdownV2(text) {
+  if (!text) return '';
+  
+  // Characters that need escaping in MarkdownV2
+  const specialChars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+  
+  let escapedText = text.toString();
+  
+  // Escape each special character
+  specialChars.forEach(char => {
+    const regex = new RegExp('\\' + char, 'g');
+    escapedText = escapedText.replace(regex, '\\' + char);
+  });
+  
+  return escapedText;
+}
+
+/**
+ * Format text as bold in MarkdownV2
+ * @param {string} text - Text to make bold
+ * @returns {string} Bold formatted text
+ */
+function formatBold(text) {
+  if (!text) return '';
+  return `*${escapeMarkdownV2(text)}*`;
+}
+
+/**
+ * Format text as italic in MarkdownV2
+ * @param {string} text - Text to make italic
+ * @returns {string} Italic formatted text
+ */
+function formatItalic(text) {
+  if (!text) return '';
+  return `_${escapeMarkdownV2(text)}_`;
+}
+
+/**
+ * Format text as underline in MarkdownV2
+ * @param {string} text - Text to underline
+ * @returns {string} Underlined formatted text
+ */
+function formatUnderline(text) {
+  if (!text) return '';
+  return `__${escapeMarkdownV2(text)}__`;
+}
+
+/**
+ * Format text as strikethrough in MarkdownV2
+ * @param {string} text - Text to strikethrough
+ * @returns {string} Strikethrough formatted text
+ */
+function formatStrikethrough(text) {
+  if (!text) return '';
+  return `~${escapeMarkdownV2(text)}~`;
+}
+
+/**
+ * Format text as spoiler in MarkdownV2
+ * @param {string} text - Text to hide as spoiler
+ * @returns {string} Spoiler formatted text
+ */
+function formatSpoiler(text) {
+  if (!text) return '';
+  return `||${escapeMarkdownV2(text)}||`;
+}
+
+/**
+ * Format text as inline code in MarkdownV2
+ * @param {string} text - Text to format as code
+ * @returns {string} Code formatted text
+ */
+function formatInlineCode(text) {
+  if (!text) return '';
+  return `\`${escapeMarkdownV2(text)}\``;
+}
+
+/**
+ * Format text as block quote in MarkdownV2
+ * @param {string} text - Text to format as quote
+ * @returns {string} Quote formatted text
+ */
+function formatBlockQuote(text) {
+  if (!text) return '';
+  const lines = text.toString().split('\n');
+  return lines.map(line => `> ${escapeMarkdownV2(line)}`).join('\n');
+}
+
+/**
+ * Convert MarkdownV1 to MarkdownV2 format
+ * @param {string} text - Text with MarkdownV1 formatting
+ * @returns {string} Text with MarkdownV2 formatting
+ */
+function convertToMarkdownV2(text) {
+  if (!text) return '';
+  
+  let converted = text.toString();
+  
+  // Characters that must be escaped in MarkdownV2 (excluding formatting chars)
+  const specialChars = ['[', ']', '(', ')', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+  
+  // Handle bold text: *text* -> *text* (preserve asterisks, escape content)
+  converted = converted.replace(/\*([^*]+)\*/g, (match, content) => {
+    // Only escape the content, keep the asterisks for formatting
+    const escapedContent = escapeMarkdownV2(content);
+    return `*${escapedContent}*`;
+  });
+  
+  // Handle italic text: _text_ -> _text_ (preserve underscores, escape content)
+  converted = converted.replace(/_([^_]+)_/g, (match, content) => {
+    // Only escape the content, keep the underscores for formatting
+    const escapedContent = escapeMarkdownV2(content);
+    return `_${escapedContent}_`;
+  });
+  
+  // Handle inline code: `text` -> `text` (preserve backticks, escape content)
+  converted = converted.replace(/`([^`]+)`/g, (match, content) => {
+    // Only escape the content, keep the backticks for formatting
+    const escapedContent = escapeMarkdownV2(content);
+    return '`' + escapedContent + '`';
+  });
+  
+  // Handle strikethrough: ~text~ -> ~text~ (preserve tildes, escape content)
+  converted = converted.replace(/~([^~]+)~/g, (match, content) => {
+    // Only escape the content, keep the tildes for formatting
+    const escapedContent = escapeMarkdownV2(content);
+    return `~${escapedContent}~`;
+  });
+  
+  // Handle links: [text](url) -> [text](url) (preserve brackets and parentheses, escape content)
+  converted = converted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+    // Only escape the content, keep the brackets and parentheses for formatting
+    const escapedLinkText = escapeMarkdownV2(linkText);
+    const escapedUrl = escapeMarkdownV2(url);
+    return `[${escapedLinkText}](${escapedUrl})`;
+  });
+  
+  // Now escape any remaining special characters that weren't part of MarkdownV1 formatting
+  // We need to escape characters that are not already escaped
+  specialChars.forEach(char => {
+    // Create a regex that matches the character if it's not already escaped
+    // Use a simpler approach that works in all JavaScript environments
+    const regex = new RegExp(`([^\\\\])${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+    converted = converted.replace(regex, `$1\\${char}`);
+    
+    // Also handle characters at the beginning of the string
+    const startRegex = new RegExp(`^${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+    converted = converted.replace(startRegex, `\\${char}`);
+  });
+  
+  return converted;
+}
+
+/**
+ * Format a message for Telegram MarkdownV2 with proper escaping
+ * @param {string} message - Message to format
+ * @param {Object} options - Formatting options
+ * @returns {string} Formatted message
+ */
+function formatTelegramMessage(message, options = {}) {
+  if (!message) return '';
+  
+  const {
+    bold = [],
+    italic = [],
+    underline = [],
+    strikethrough = [],
+    spoiler = [],
+    inlineCode = [],
+    blockQuote = false
+  } = options;
+  
+  let formatted = message.toString();
+  
+  // Apply formatting to specified text segments
+  bold.forEach(text => {
+    const escaped = escapeMarkdownV2(text);
+    formatted = formatted.replace(new RegExp(escapeMarkdownV2(text), 'g'), `*${escaped}*`);
+  });
+  
+  italic.forEach(text => {
+    const escaped = escapeMarkdownV2(text);
+    formatted = formatted.replace(new RegExp(escapeMarkdownV2(text), 'g'), `_${escaped}_`);
+  });
+  
+  underline.forEach(text => {
+    const escaped = escapeMarkdownV2(text);
+    formatted = formatted.replace(new RegExp(escapeMarkdownV2(text), 'g'), `__${escaped}__`);
+  });
+  
+  strikethrough.forEach(text => {
+    const escaped = escapeMarkdownV2(text);
+    formatted = formatted.replace(new RegExp(escapeMarkdownV2(text), 'g'), `~${escaped}~`);
+  });
+  
+  spoiler.forEach(text => {
+    const escaped = escapeMarkdownV2(text);
+    formatted = formatted.replace(new RegExp(escapeMarkdownV2(text), 'g'), `||${escaped}||`);
+  });
+  
+  inlineCode.forEach(text => {
+    const escaped = escapeMarkdownV2(text);
+    formatted = formatted.replace(new RegExp(escapeMarkdownV2(text), 'g'), `\`${escaped}\``);
+  });
+  
+  // Apply block quote if requested
+  if (blockQuote) {
+    formatted = formatBlockQuote(formatted);
+  }
+  
+  return formatted;
 }
 
 //--------- TRIGGER MANAGEMENT --------------//
@@ -363,3 +586,51 @@ function listTriggers() {
     return [];
   }
 }
+
+//--------- MARKDOWN V2 TESTING --------------//
+
+/**
+ * Test the specific failing case
+ */
+function testFailingCase() {
+  const failingInput = "💸Chi *€20.00* cho *Ăn cơm* _✏️🛒Chi phí biến đổi, mục 🍽️Ăn ngoài, ⚠️ đã vượt: €163.19_ _(ID: TX1758486580960896)_";
+  const result = convertToMarkdownV2(failingInput);
+  
+  Logger.log('=== Testing Failing Case ===');
+  Logger.log(`Input: ${failingInput}`);
+  Logger.log(`Output: ${result}`);
+  
+  // Check if the output is valid MarkdownV2
+  const hasUnescapedDots = /[^\\]\./.test(result);
+  const hasUnescapedUnderscores = /[^\\]_/.test(result);
+  const hasUnescapedAsterisks = /[^\\]\*/.test(result);
+  
+  Logger.log(`Has unescaped dots: ${hasUnescapedDots}`);
+  Logger.log(`Has unescaped underscores: ${hasUnescapedUnderscores}`);
+  Logger.log(`Has unescaped asterisks: ${hasUnescapedAsterisks}`);
+  
+  return result;
+}
+
+/**
+ * Test the specific example from the user query
+ */
+function testUserExample() {
+  const input = "💸Chi *€20.00* cho *Ăn cơm*\n _✏️🛒Chi phí biến đổi, mục 🍽️Ăn ngoài, ⚠️ đã vượt: €143.19_\n_(ID: TX1758488220914260)_";
+  const expected = "💸Chi *€20\\.00* cho *Ăn cơm*\n_✏️🛒Chi phí biến đổi, mục 🍽️Ăn ngoài, ⚠️ đã vượt: €143\\.19_\n_\\(ID: TX1758488220914260\\)_";
+  const result = convertToMarkdownV2(input);
+  
+  Logger.log('=== Testing User Example ===');
+  Logger.log(`Input: ${input}`);
+  Logger.log(`Expected: ${expected}`);
+  Logger.log(`Output: ${result}`);
+  Logger.log(`Match: ${result === expected}`);
+  
+  return {
+    input: input,
+    expected: expected,
+    result: result,
+    match: result === expected
+  };
+}
+
