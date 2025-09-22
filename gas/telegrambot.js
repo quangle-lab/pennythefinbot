@@ -60,10 +60,10 @@ function checkTelegramMessages() {
         const fileId = photo.file_id;
         
         // Process the receipt photo
-        const photoResult = processReceiptPhoto(fileId, replyText);
+        const photoResult = handleReceiptPhoto(fileId, replyText);
         
         if (photoResult.success) {
-          sendTelegramMessage(photoResult.message);
+          sendTelegramMessage(photoResult.message, photoResult.replyMarkup);
         } else {
           sendTelegramMessage(`❌ Lỗi khi xử lý ảnh: ${photoResult.error}`);
         }
@@ -244,6 +244,36 @@ function initMonthlyBudget () {
   let budgetAnlyticsResp = analyseDataWithOpenAI (budgetPrompt);
   
   sendTelegramMessage (budgetAnlyticsResp);
+}
+
+/**
+ * Download photo from Telegram API
+ * @param {string} fileId - Telegram file ID
+ * @returns {Blob} Downloaded photo blob
+ */
+function getTelegramPhoto(fileId) {
+  try {
+    const telegramToken = TELEGRAM_TOKEN;
+    
+    // Get file info from Telegram
+    const fileInfoUrl = `https://api.telegram.org/bot${telegramToken}/getFile?file_id=${fileId}`;
+    const fileInfoResponse = UrlFetchApp.fetch(fileInfoUrl);
+    const fileInfo = JSON.parse(fileInfoResponse.getContentText());
+    
+    if (!fileInfo.ok) {
+      throw new Error(`Failed to get file info: ${fileInfo.description}`);
+    }
+    
+    // Download the file
+    const fileUrl = `https://api.telegram.org/file/bot${telegramToken}/${fileInfo.result.file_path}`;
+    const fileResponse = UrlFetchApp.fetch(fileUrl);
+    
+    return fileResponse.getBlob();
+    
+  } catch (error) {
+    Logger.log(`Error downloading Telegram photo: ${error.toString()}`);
+    throw new Error(`Failed to download photo: ${error.toString()}`);
+  }
 }
 
 //handle callback queries from inline keyboard buttons

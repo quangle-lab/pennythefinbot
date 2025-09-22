@@ -458,9 +458,9 @@ function addConfirmedTransaction(sheetName, transactionData) {
       
       if (budget > 0) {
         if (remaining >= 0) {
-          remainingMessage = `💶 còn: €${remaining.toFixed(2)}`;
+          remainingMessage = `💶còn: €${remaining.toFixed(2)}`;
         } else {
-          remainingMessage = `⚠️ đã vượt: €${Math.abs(remaining).toFixed(2)}`;
+          remainingMessage = `⚠️đã vượt: €${Math.abs(remaining).toFixed(2)}`;
         }
       }
     }

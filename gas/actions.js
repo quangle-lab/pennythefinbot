@@ -45,9 +45,6 @@ function handleIntent(intentObj, originalText, replyText) {
       case "search":
         return handleSearch(intentObj);
 
-      case "receiptPhoto":
-        return handleReceiptPhoto(intentObj);
-
       case "others":
       default:
         return handleOthers(intentObj);
@@ -540,41 +537,70 @@ function handleOthers(intentObj) {
   }
 }
 
-//xử lý intent receiptPhoto - xử lý ảnh hóa đơn
-function handleReceiptPhoto(intentObj) {
+
+/**
+ * Process receipt photo and extract transaction data
+ * @param {string} fileId - Telegram file ID
+ * @param {string} userMessage - Optional user message with the photo
+ * @returns {Object} Result object with success status and data/error
+ */
+function handleReceiptPhoto(fileId, userMessage = "") {
   try {
-    const { fileId, userMessage } = intentObj;
-
-    if (!fileId) {
+    // Download the photo
+    const photoBlob = getTelegramPhoto(fileId);
+    
+    // Validate image format
+    if (!validateImageFormat(photoBlob)) {
       return {
         success: false,
-        messages: [`❌ Thiếu thông tin ảnh để xử lý.`],
-        logs: [`Missing fileId for receipt photo processing`]
+        error: "Định dạng ảnh không được hỗ trợ. Vui lòng gửi ảnh JPG, PNG, GIF hoặc WebP."
       };
     }
-
-    // Use the utility function to process the receipt photo
-    const result = processReceiptPhoto(fileId, userMessage);
-
-    if (!result.success) {
+    
+    // Convert to base64
+    const base64Image = convertImageToBase64(photoBlob);
+    
+    // Analyze the receipt using OpenAI Vision API
+    const analysisResult = analyzeReceiptPhoto(base64Image, userMessage);
+    
+    if (!analysisResult.success) {
       return {
         success: false,
-        messages: [result.error],
-        logs: [`Error in receipt photo processing: ${result.error}`]
+        error: analysisResult.error
       };
     }
-
+    
+    // Process the extracted transaction data
+    const transactionData = analysisResult.data;
+    const addResult = addConfirmedTransaction(transactionData.tab, {
+      type: transactionData.type,
+      date: transactionData.date,
+      description: transactionData.desc,
+      amount: transactionData.amount,
+      location: transactionData.location,
+      category: transactionData.category,
+      bankComment: transactionData.comment || "từ ảnh hóa đơn"
+    });
+    
+    if (!addResult.success) {
+      return {
+        success: false,
+        error: addResult.error
+      };
+    }
+    
     return {
       success: true,
-      messages: [result.message],
-      logs: [`Receipt photo processed successfully: ${result.data ? JSON.stringify(result.data) : 'No data'}`]
+      message: addResult.message,
+      data: transactionData,
+      replyMarkup: addResult.replyMarkup
     };
-
+    
   } catch (error) {
+    Logger.log(`Error in handleReceiptPhoto: ${error.toString()}`);
     return {
       success: false,
-      messages: [`❌ Lỗi khi xử lý ảnh hóa đơn: ${error.toString()}`],
-      logs: [`Error in handleReceiptPhoto: ${error.toString()}`]
+      error: `Lỗi khi xử lý ảnh hóa đơn: ${error.toString()}`
     };
   }
 }

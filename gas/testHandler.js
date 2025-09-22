@@ -925,6 +925,53 @@ function testHandleDeleteTransaction() {
   }
 }
 
+//--------- MARKDOWN V2 TESTING --------------//
+
+/**
+ * Test the specific failing case
+ */
+function testFailingCase() {
+  const failingInput = "💸Chi *€20.00* cho *Ăn cơm* _✏️🛒Chi phí biến đổi, mục 🍽️Ăn ngoài, ⚠️ đã vượt: €163.19_ _(ID: TX1758486580960896)_";
+  const result = convertToMarkdownV2(failingInput);
+  
+  Logger.log('=== Testing Failing Case ===');
+  Logger.log(`Input: ${failingInput}`);
+  Logger.log(`Output: ${result}`);
+  
+  // Check if the output is valid MarkdownV2
+  const hasUnescapedDots = /[^\\]\./.test(result);
+  const hasUnescapedUnderscores = /[^\\]_/.test(result);
+  const hasUnescapedAsterisks = /[^\\]\*/.test(result);
+  
+  Logger.log(`Has unescaped dots: ${hasUnescapedDots}`);
+  Logger.log(`Has unescaped underscores: ${hasUnescapedUnderscores}`);
+  Logger.log(`Has unescaped asterisks: ${hasUnescapedAsterisks}`);
+  
+  return result;
+}
+
+/**
+ * Test the specific example from the user query
+ */
+function testUserExample() {
+  const input = "💸Chi *€20.00* cho *Ăn cơm*\n _✏️🛒Chi phí biến đổi, mục 🍽️Ăn ngoài, ⚠️ đã vượt: €143.19_\n_(ID: TX1758488220914260)_";
+  const expected = "💸Chi *€20\\.00* cho *Ăn cơm*\n_✏️🛒Chi phí biến đổi, mục 🍽️Ăn ngoài, ⚠️ đã vượt: €143\\.19_\n_\\(ID: TX1758488220914260\\)_";
+  const result = convertToMarkdownV2(input);
+  
+  Logger.log('=== Testing User Example ===');
+  Logger.log(`Input: ${input}`);
+  Logger.log(`Expected: ${expected}`);
+  Logger.log(`Output: ${result}`);
+  Logger.log(`Match: ${result === expected}`);
+  
+  return {
+    input: input,
+    expected: expected,
+    result: result,
+    match: result === expected
+  };
+}
+
 //individual test runner functions for manual testing
 
 // Search functionality tests

@@ -687,6 +687,16 @@ function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
   - Bước 5: Phân loại giao dịch vào nhóm và mục phù hợp dựa trên hoàn cảnh gia đình và chỉ dẫn phân loại
   - Bước 6: Xác định loại giao dịch (Thu hay Chi)
 
+  # Hoàn cảnh gia đình khách hàng 
+  ${familyContext}
+
+  # Các chỉ dẫn phân loại/dự toán cần thiết
+  ${catInstructions}
+  
+  # Danh sách các nhóm và mục phân loại
+  Tuyệt đối tuân thủ tên nhóm và mục phân loại bao gồm cả tên và emoji
+  ${catPrompt}
+
   ## Định dạng phản hồi
   Trả về kết quả dưới dạng JSON, không có dấu code block, không có lời giải thích:
 
@@ -701,13 +711,6 @@ function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
     "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
     "comment": "từ ảnh hóa đơn"
   }
-
-  # Hoàn cảnh gia đình khách hàng và các chỉ dẫn phân loại/dự toán cần thiết
-  ${familyContext}
-  
-  ${catInstructions}
-  
-  ${catPrompt}
 
   `;
 
