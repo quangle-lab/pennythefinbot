@@ -77,18 +77,8 @@ function processBankAlerts() {
         };
 
         const checkResult = checkAndConfirmTransaction(tx);
-        if (checkResult.exists) {
-          //gửi thông báo Telegram để xác nhận với buttons
-          sendTelegramMessage (checkResult.message, checkResult.replyMarkup);
-        } else {
-          //thêm mới giao dịch
-          const addResult = addConfirmedTransaction(groupTx, tx);      
-          sendTelegramMessage (addResult.message, addResult.replyMarkup);  
-          if (!addResult.success) {
-            sendTelegramMessage (addResult.error);
-            continue;
-          }
-        }
+        sendTelegramMessage (checkResult.message, checkResult.replyMarkup);
+
       } else {
         // Intent không xác định hoặc lỗi
         Logger.log(`Không xác định được loại thông báo: ${subject}`);
@@ -123,7 +113,7 @@ function isValidTransaction(aiResult, subject, body, message = null) {
     
     // Kiểm tra định dạng số tiền
     if (aiResult.balance) {
-      const balanceStr = aiResult.balance.toString().replace(/[€\s,]/g, '');
+      const balanceStr = parseCurrency(aiResult.balance.toString());
       const balanceNum = parseFloat(balanceStr);
       
       if (isNaN(balanceNum) || balanceNum < 0) {
@@ -134,7 +124,7 @@ function isValidTransaction(aiResult, subject, body, message = null) {
     return true;
   } else if (aiResult.intent === 'AddTx') {
     // Kiểm tra giao dịch thông thường
-    const invalidValues = ['N/A', '', null, undefined, '0', '€0.00', '0.00'];
+    const invalidValues = ['N/A', '', null, undefined, '0', `${getCurrencyFormat().symbol}0.00`, '0.00'];
 
     // Nếu group là N/A thì chắc chắn không phải giao dịch
     if (invalidValues.includes(aiResult.group)) {
@@ -162,7 +152,7 @@ function isValidTransaction(aiResult, subject, body, message = null) {
 
     // 4. Kiểm tra định dạng số tiền có hợp lệ không
     if (aiResult.amount) {
-      const amountStr = aiResult.amount.toString().replace(/[€\s,]/g, '');
+      const amountStr = parseCurrency(aiResult.amount.toString());
       const amountNum = parseFloat(amountStr);
 
       // Nếu số tiền <= 0 hoặc không phải số thì không hợp lệ
@@ -170,7 +160,7 @@ function isValidTransaction(aiResult, subject, body, message = null) {
         return false;
       }
 
-      // Nếu số tiền quá lớn (> 50,000 EUR) có thể là spam
+      // Nếu số tiền quá lớn (> 50,000) có thể là spam
       if (amountNum > 50000) {
         return false;
       }

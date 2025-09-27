@@ -10,11 +10,14 @@ function generateBankBalanceClassificationPrompt(subject, body) {
   const catPrompt = getTxCat();
 
   let mainPrompt = `
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+  The current time is ${currentTime}. The date format is ${getDateFormat()}.
 
   # Identity  
   Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
   Nhiệm vụ của bạn là phân tích email từ ngân hàng để xác định loại thông báo và xử lý phù hợp.
+  
+  # Language Instructions
+  ${getLanguageInstruction()}
 
   # Nội dung email từ ngân hàng của khách hàng
   - Tiêu đề email: ${subject}
@@ -29,7 +32,7 @@ function generateBankBalanceClassificationPrompt(subject, body) {
   - Bước 2: Kiểm tra nội dung email có chứa thông tin về số dư tài khoản không
       - Tìm các từ khóa: "solde", "balance", "compte", "account", "soldes", "balances"
       - Tìm số tài khoản: thường có định dạng "Compte n°X0371 XXXXXX509 01"
-      - Tìm số tiền số dư (format: €X,XXX.XX hoặc X XXX,XX €)
+      - Tìm số tiền số dư (format: ${getCurrencyExample()})
   - Bước 3: Nếu là thông báo số dư tài khoản, trả về intent "UpdateBankBalance"
   - Bước 4: Nếu là thông báo giao dịch thông thường, trả về intent "AddTx"
   - Bước 5: Trả về thông tin chi tiết theo cấu trúc JSON
@@ -41,7 +44,7 @@ function generateBankBalanceClassificationPrompt(subject, body) {
     {
       "intent": "UpdateBankBalance",
       "accountNumber": "số tài khoản ngân hàng, chỉ trả 5 số cuối và bao gồm khoảng trắng, ví dụ 509 01",
-      "balance": "số dư tài khoản theo định dạng €X,XXX.XX",
+      "balance": "số dư tài khoản theo định dạng ${getCurrencyExample()}",
       "date": "ngày cập nhật số dư theo định dạng DD/MM/YYYY",
       "group": "tên nhóm tương ứng với tài khoản, dùng đúng tên nhóm kèm emoji (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục tiêu, Tiết kiệm)"
     }
@@ -54,7 +57,7 @@ function generateBankBalanceClassificationPrompt(subject, body) {
       "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
       "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
       "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
-      "amount": "số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
+      "amount": "số tiền giao dịch theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết)",
       "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
       "bankcomment": "trích chú thích Ngân hàng, chỉ ghi thông tin địa điểm phát sinh giao dịch"
     }
@@ -70,7 +73,7 @@ function generateBankBalanceClassificationPrompt(subject, body) {
 
   return {
     systemMessage: `      
-      The current time is ${currentTime}
+      The current time is ${currentTime}. The date format is ${getDateFormat()}.
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.      
@@ -96,10 +99,13 @@ function generateIntentDetectionPrompt (originalText, replyText) {
   
   let intentDetectionPrompt = `  
   # Identity  
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+  The current time is ${currentTime}. The date format is ${getDateFormat()}.
 
   Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram.  
-  Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.   
+  Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
+  
+  # Language Instructions
+  ${getLanguageInstruction()}   
   
   # Nội dung trao đổi 
   Đây là nội dung trao đổi giữa bạn và khách hàng: "${userText}", 
@@ -119,11 +125,11 @@ function generateIntentDetectionPrompt (originalText, replyText) {
     - addTx: thêm thủ công 1 giao dịch mới
     - modifyTx: cập nhật dòng giao dịch (số tiền, ngày chi, miêu tả, mục trong cùng nhóm) hoặc chuyển dòng qua nhóm và mục mới. Dùng đúng tên Nhóm và mục như trong Các mục giao dịch
       - Ví dụ 1
-        - Tin gốc: "Thu €88.71 cho Hoàn tiền bảo hiểm GENERATION ✏️Ghi vào 🛟Quỹ gia đình, mục 🚰Thu, dòng 25".
+        - Tin gốc: "Thu ${getCurrencyExample()} cho Hoàn tiền bảo hiểm GENERATION ✏️Ghi vào 🛟Quỹ gia đình, mục 🚰Thu, dòng 25".
         - Phản hồi của khách hàng: đây là chinh phí bảo hiểm sức khỏe.
         - Ý định: phân loại sai. Cần chuyển từ Nhóm Quỹ gia đình > Thu sang Chi phí cố định > BH sức khỏe.
       - Ví dụ 2
-        - Tin gốc: "💸Chi €4.13 cho Đặt đồ ăn UBER EATS ✏️Ghi vào 🛒Chi phí biến đổi, mục Chợ, dòng 102".
+        - Tin gốc: "💸Chi ${getCurrencyExample()} cho Đặt đồ ăn UBER EATS ✏️Ghi vào 🛒Chi phí biến đổi, mục Chợ, dòng 102".
         - Phản hồi của khách hàng: này là tiền ăn ngoài.
         - Ý định: phân loại sai. Cần chuyển từ mục Chợ thành Ăn ngoài.
     - deleteTx: xóa dòng giao dịch           
@@ -137,8 +143,8 @@ function generateIntentDetectionPrompt (originalText, replyText) {
     - addNewBudget: tạo dự toán cho tháng mới hoặc dự án mới        
     - modifyBudget: cập nhật dự toán dự trên thông tin bạn đề nghị
         - Ví dụ 1
-          - Tin gốc: "Tăng mục Ăn ngoài lên €200 cho tháng tới"            
-          - Ý định: cần tăng mục Ăn ngoài lên €200 cho tháng tới
+          - Tin gốc: "Tăng mục Ăn ngoài lên ${getCurrencyExample()} cho tháng tới"            
+          - Ý định: cần tăng mục Ăn ngoài lên ${getCurrencyExample()} cho tháng tới
         - Ví dụ 2
           - Tin gốc: "Giảm mục Xe hơi xuống 0"            
           - Ý định: cần giảm mục Xe hơi xuống 0 cho tháng tới
@@ -151,7 +157,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         - Hỏi: lấy số dư các quỹ tiết kiệm
     - consult: tư vấn tài chính bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân
       - Kiểm tra khả năng chi trả: phân tích xem có thể mua/chi trả một khoản tiền nào đó không
-        - Ví dụ 1: "Tôi có thể mua chiếc laptop 1000 euro không?"
+        - Ví dụ 1: "Tôi có thể mua chiếc laptop 1000 ${getCurrentLocale().currency.toLowerCase()} không?"
         - Ví dụ 2: "Tôi còn bao nhiêu tiền trong tài khoản ngân hàng tới cuối tháng?"
       - Coaching tài chính: hỏi lời khuyên về quản lý tài chính, tiết kiệm, đầu tư
         - Ví dụ 1: "Tôi có thể làm gì để giảm chi tiêu và để dành được nhiều tiền hơn?"
@@ -167,12 +173,12 @@ function generateIntentDetectionPrompt (originalText, replyText) {
           
   ## Tin nhắn nhiều ý định
   Trong một tin nhắn của khách hàng có thể có nhiều ý định:
-  - Ví dụ 1: khách hàng yêu cầu chuyển 600 EUR từ quỹ mục đích sang quỹ gia đình thì có 2 ý định
-    - 1/ intent trong nhóm quỹ gia đình, mục Chuyển nội bộ, số tiền 600 EUR
-    - 2/ intent trong nhóm quỹ mục đích, mục Thu, số tiền 600 EUR
-  - Ví dụ 2: khách hàng yêu cầu chi trả tiền cấp cứu mèo bằng quỹ gia đình 200 EUR thì có 2 ý định
-    - 1/ intent trong nhóm quỹ gia đình, mục Phát sinh, số tiền 200 EUR
-    - 2/ intent trong nhóm chi phí biến đổi, mục Mèo, số tiền 200 EUR
+  - Ví dụ 1: khách hàng yêu cầu chuyển 600 ${getCurrentLocale().currency} từ quỹ mục đích sang quỹ gia đình thì có 2 ý định
+    - 1/ intent trong nhóm quỹ gia đình, mục Chuyển nội bộ, số tiền 600 ${getCurrentLocale().currency}
+    - 2/ intent trong nhóm quỹ mục đích, mục Thu, số tiền 600 ${getCurrentLocale().currency}
+  - Ví dụ 2: khách hàng yêu cầu chi trả tiền cấp cứu mèo bằng quỹ gia đình 200 ${getCurrentLocale().currency} thì có 2 ý định
+    - 1/ intent trong nhóm quỹ gia đình, mục Phát sinh, số tiền 200 ${getCurrentLocale().currency}
+    - 2/ intent trong nhóm chi phí biến đổi, mục Mèo, số tiền 200 ${getCurrentLocale().currency}
   Trả về 1 danh sách sau dưới dạng JSON, không có dấu code block.
       {"intents": [
         //mảng các intent được miêu tả dưới đây
@@ -196,7 +202,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "date":"ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
         "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi', chỉ áp dụng cho intent 'addTx' hoặc 'modifyTx'",
         "desc":"miêu tả về giao dịch, ngắn gọn, tối đa 30 ký tự, dựa trên miêu tả cũ và yêu cầu của khách hàng",
-        "amount":"số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
+        "amount":"số tiền giao dịch theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết)",
         "location":"nơi phát sinh giao dịch. 3 giá trị thường gặp là Rennes, Nantes, N/A",
         "category":"mục phân loại, tuân thủ tuyệt đối tên mục trong chỉ dẫn phân loại,cả chữ lẫn emoji",
         "comment": 1 trong 2 giá trị dưới đây nếu chưa có lời ghi chú, nếu có lời ghi chú rồi thì giữ nguyên không thay đổi
@@ -223,7 +229,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
           {
             "group":"nhóm dự toán". Sử dụng tên nhóm như trong Chỉ dẫn phân loại, bao gồm cả emoji.
             "category":"mục trong từng nhóm". Sử dụng đúng tên mục như trong Chỉ dẫn phân loại bao gồm cả emoji.
-            "amount":"số tiền dự toán theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết), số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
+            "amount":"số tiền dự toán theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết), số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
             "ghi chú":"ghi chú của khách hàng về mục dự toán này cho tháng"
           }
         ]
@@ -242,7 +248,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "consultType":"affordability hoặc coaching hoặc general",
         "question":"câu hỏi hoặc yêu cầu tư vấn của khách hàng",
         "item":"(chỉ cho affordability) tên món đồ hoặc khoản chi tiêu khách hàng muốn mua/chi trả",
-        "amount":"(chỉ cho affordability) số tiền dự kiến chi theo định dạng €20.00",
+        "amount":"(chỉ cho affordability) số tiền dự kiến chi theo định dạng ${getCurrencyExample()}",
         "category":"(chỉ cho affordability) mục phân loại dự kiến cho khoản chi này theo danh sách categories",
         "group":"(chỉ cho affordability) nhóm phân loại dự kiến cho khoản chi này",
         "timeframe":"(chỉ cho affordability) thời gian dự kiến chi trả (ngay lập tức, tháng này, tháng tới, quý này, năm này, etc.)",
@@ -271,7 +277,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
 
   return {
    systemMessage: `      
-      The current time is ${currentTime}. The date format is dd/MM/yyyy.
+      The current time is ${currentTime}. The date format is ${getDateFormat()}.
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
@@ -292,13 +298,16 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
   const categories = getTxCat();
 
   let mainPrompt = `
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+  The current time is ${currentTime}. The date format is ${getDateFormat()}.
     
   # Identity  
   Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram. 
   Nhiệm vụ của bạn là 
   - phân loại các giao dịch, thay đổi theo yêu cầu khách hàng và cải thiện chế độ phân loại
   - đề xuất dự toán hàng tháng, thay đổi số tiền trong dự toán theo yêu cầu của khách hàng
+  
+  # Language Instructions
+  ${getLanguageInstruction()}
 
   # Nội dung trao đổi
   - Đây là thông tin giao dịch gốc ${originalTxDesc}\n
@@ -338,7 +347,7 @@ function generateDetectNewContextPrompt(originalTx, originalText, replyText) {
 
   return {
     systemMessage: `      
-      The current time is ${currentTime}
+      The current time is ${currentTime}. The date format is ${getDateFormat()}.
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
@@ -364,11 +373,14 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
     case "dashboard": {
       monthDashboardData = getDashboardData (monthText);
       expenseAnalyticsPrompt = `
-        The current time is ${currentTime}. The date format is dd/MM/yyyy.
+        The current time is ${currentTime}. The date format is ${getDateFormat()}.
 
         # Identity
         Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân.     
         Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
+        
+        # Language Instructions
+        ${getLanguageInstruction()}
 
         # Yêu cầu của khách hàng
         Đây là yêu cầu của khách hàng theo ngôn ngữ tự nhiên: ${userText}\n
@@ -379,7 +391,7 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
 
         ##Yêu cầu trình bày
         - Giới hạn trong 200 ký tự
-        - Ngôn ngữ: mặc định tiếng Việt. Nếu khách hàng hỏi bằng ngôn ngữ khác (e.g. what is the breakdown for fix expense this month?), hãy trả lời bằng cùng ngôn ngữ với khách hàng.
+        - Ngôn ngữ: ${getLanguageInstruction()}
         - Dùng đúng tên mục trong báo cáo tài chính
         - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng  
         - Dùng định dạng MarkdownV2 cho Telegram, không có dấu code block
@@ -422,7 +434,7 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
 
         *Tháng ${monthText}*        
         _Tính đến ngày ${currentDate}_
-        ======
+       
           *🏡Chi phí cố định*
             - dự chi
             - thực chi
@@ -437,16 +449,16 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
         - 🎯Thu vào quỹ mục đích: xem hàng TỔNG Thực Tế trong quỹ mục đích (nếu dư thì tốt, còn lại thì xấu)
         - 🫙Thu vào tiết kiệm: xem hàng TỔNG Thực Tế trong tiết kiệm (nếu dư thì tốt, còn lại thì xấu)
 
-        =====
+        
         *🤯Mục vượt dự chi*
           Cho mỗi nhóm, nêu các mục vượt dự chi và số tiền vượt. Nêu bật bằng emoji ⚠️(vượt mức dưới 5%) hoặc ‼️(nghiêm trọng -- vượt rất xa dự tính)
-        =====
+      
         *🎯Mục tiêu*: phân tích tình hình chi tiêu hiện tại và khả năng hoàn thành mục tiêu
 
         ### Nếu là yêu cầu Chi tiết theo nhóm hoặc theo mục, trả lời theo cấu trúc dưới đây, không kèm ghi chú:
         *Tháng ${monthText}*
         _Tính đến ngày ${currentDate}_
-        ======
+        
           *Tên nhóm*
           *Tên mục 1* 
             - dự chi
@@ -459,7 +471,7 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
             - *chênh lệch*          
           ...
         Nếu nhóm có mục vượt dự chi, nêu bật bằng emoji ⚠️(vượt mức dưới 5%) hoặc ‼️(nghiêm trọng -- vượt rất xa dự tính)
-        =====
+      
         *🎯Mục tiêu*: phân tích tình hình chi tiêu hiện tại và khả năng hoàn thành mục tiêu 
         
         # Hoàn cảnh và dữ liệu
@@ -479,7 +491,7 @@ function generateExpenseAnalyticsPrompt(userText, monthText, dataSource) {
   }
   return {         
     systemMessage: `      
-      The current time is ${currentTime} (date format is dd/MM/yyyy)
+      The current time is ${currentTime} (date format is ${getDateFormat()})
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
@@ -508,22 +520,25 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText, replyText) 
   const fundBalances = formatFundBalances(getFundBalances());
   
   budgetAnalyticsPrompt = `
-    The current time is ${currentTime}. The date format is dd/MM/yyyy.
+    The current time is ${currentTime}. The date format is ${getDateFormat()}.
 
     # Danh tính
     Bạn là chuyên gia cố vấn có kinh nghiệm và coach tài chính cá nhân.     
     Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
+    
+    # Language Instructions
+    ${getLanguageInstruction()}
 
     # Yêu cầu khách hàng
     ## Các bước phân tích
     Dựa trên các thông tin về chi tiêu, hoàn cảnh, chỉ dẫn dự toán, hãy tiến hành các bước sau và trả lời cho khách hàng.
-    Đầu tiên, xác định ngôn ngữ khách hàng đang dùng để trả lời cho khách hàng. Ví dụ nếu khách hàng hỏi bằng what is the breakdown for fix expense this month?, hãy trả lời bằng tiếng anh.
+    Đầu tiên, xác định ngôn ngữ khách hàng đang dùng để trả lời cho khách hàng theo hướng dẫn ngôn ngữ ở trên.
     - Bước 1: đối chiếu dự toán tháng ${nextMonthText} với chi tiêu tháng ${thisMonthText} từ phần Dữ liệu
     - Bước 2: tra cứu các chỉ dẫn dự toán xem tháng sau có phát sinh giao dịch gì không từ phẩn Chỉ dẫn
     - Bước 3: dựa trên các thông tin trên, đề xuất các thay đổi cho dự toán tháng ${nextMonthText}  
     - Bước 4: trả lời cho khách hàng theo cấu trúc sau và tuần thủ yêu cầu trình bày
       - Giới hạn trong 250 ký tự
-      - Ngôn ngữ: mặc định tiếng Việt. Nếu khách hàng hỏi bằng ngôn ngữ khác (e.g. what is the breakdown for fix expense this month?), hãy trả lời bằng cùng ngôn ngữ với khách hàng.
+      - Ngôn ngữ: ${getLanguageInstruction()}
       - Dùng đúng tên mục trong báo cáo tài chính
       - Trình bày dùng text minh họa và emoji theo đúng emoji trong báo cáo tài chính tháng 
       - Dùng dấu ✅ để ghi nhận chênh lệch tốt và ⚠️ để ghi nhận chênh lệch xấu
@@ -577,7 +592,7 @@ function generateBudgetAnalyticsPrompt(nextMonthText, thisMonthText, replyText) 
 
   return {         
    systemMessage: `      
-      The current time is ${currentTime}
+      The current time is ${currentTime}. The date format is ${getDateFormat()}.
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
@@ -591,7 +606,7 @@ function generateConsultPrompt(userQuestion, consultType = "general", intentObj)
   const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
   const systemPrompt = `
-    The current date is ${currentTime}. The date format is dd/MM/yyyy.
+    The current date is ${currentTime}. The date format is ${getDateFormat()}.
 
     # Identity
     You are a personal financial coach talking to your customer via Telegram.
@@ -600,14 +615,14 @@ function generateConsultPrompt(userQuestion, consultType = "general", intentObj)
 
     # Instructions
     Based on the customer goal, close with any final advice or truths the customer may need to hear - especially things they might resist but need to confront to achieve their goal.
-    Use the following language: Vietnamese
+    ${getLanguageInstruction()}
     Don't just rely on the tools, plan and think of all the steps to solve the customer question.
 
-    Use the available tools to gather the necessary financial data, then provide your comprehensive analysis in Vietnamese.
+    Use the available tools to gather the necessary financial data, then provide your comprehensive analysis.
     `;
 
   let consultPrompt = `
-    The current date is ${currentTime}. The date format is dd/MM/yyyy.
+    The current date is ${currentTime}. The date format is ${getDateFormat()}.
 
     # Customer Request    
   `;
@@ -635,7 +650,7 @@ function generateConsultPrompt(userQuestion, consultType = "general", intentObj)
     5. Always consider the family context and budget guidelines
 
     # Response Format
-    - Use Vietnamese language
+    - ${getLanguageInstruction()}
     - Be friendly but professional
     - Use appropriate emojis
     - Use Telegram MarkdownV2 format (no code blocks)
@@ -667,11 +682,14 @@ function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
   const catPrompt = getTxCat();
 
   let mainPrompt = `
-  The current time is ${currentTime}. The date format is dd/MM/yyyy.
+  The current time is ${currentTime}. The date format is ${getDateFormat()}.
 
   # Identity  
   Bạn là chuyên gia tư vấn tài chính cá nhân đang phân tích ảnh hóa đơn để trích xuất thông tin giao dịch.
   Nhiệm vụ của bạn là phân tích ảnh hóa đơn và trích xuất thông tin giao dịch một cách chính xác.
+  
+  # Language Instructions
+  ${getLanguageInstruction()}
 
   # Ảnh hóa đơn
   Đây là ảnh hóa đơn mà khách hàng gửi để thêm giao dịch vào hệ thống.
@@ -707,7 +725,7 @@ function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
     "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
     "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
     "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
-    "amount": "số tiền giao dịch theo định dạng €20.00 (bỏ dấu + hay - nếu cần thiết)",
+    "amount": "số tiền giao dịch theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết)",
     "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
     "comment": "từ ảnh hóa đơn"
   }
@@ -716,7 +734,7 @@ function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
 
   return {
     systemMessage: `      
-      The current time is ${currentTime}
+      The current time is ${currentTime}. The date format is ${getDateFormat()}.
       ## PERSISTENCE
       You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
       Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.      

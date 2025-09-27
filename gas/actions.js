@@ -34,14 +34,6 @@ function handleIntent(intentObj, originalText, replyText) {
       case "consult":
         return handleConsult(intentObj, replyText);
 
-      case "affordTest":
-        // DEPRECATED: Use "consult" intent instead
-        return handleAffordTest(intentObj, replyText);
-
-      case "coaching":
-        // DEPRECATED: Use "consult" intent instead
-        return handleCoaching(intentObj, replyText);
-
       case "search":
         return handleSearch(intentObj);
 
@@ -322,7 +314,7 @@ function handleCreateBudget(intentObj, replyText) {
     if (creationResult.existingLines && creationResult.existingLines.length > 0) {
       let existingMessage = "\n📋 *Các dự toán đã tồn tại*\:\n\n";
       creationResult.existingLines.forEach((line, index) => {
-        existingMessage += `${index + 1}\. *${line.group}* / ${line.category} / €${line.amount}\n`;
+        existingMessage += `${index + 1}\. *${line.group}* / ${line.category} / ${formatCurrency(line.amount)}\n`;
       });
       existingMessage += "\n💬 Trả lời tin nhắn này nếu bạn muốn chỉnh sửa các dự toán đã tồn tại.";
       messages.push(existingMessage);

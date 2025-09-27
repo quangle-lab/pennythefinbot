@@ -33,24 +33,160 @@ function validateImageFormat(imageBlob) {
 }
 
 /**
+ * Get current locale configuration
+ * @returns {Object} Current locale configuration
+ */
+function getCurrentLocale() {
+  return LOCALE_CONFIG;
+}
+
+/**
+ * Get currency format configuration for a specific currency
+ * @param {string} currency - The currency code (EUR, VND, USD)
+ * @returns {Object} Currency format configuration
+ */
+function getCurrencyFormat(currency = null) {
+  const currentCurrency = currency || LOCALE_CONFIG.currency;
+  return LOCALE_CONFIG.currencyFormat[currentCurrency] || LOCALE_CONFIG.currencyFormat.EUR;
+}
+
+/**
+ * Get currency example from configuration
+ * @param {string} currency - The currency code (optional, uses current locale if not provided)
+ * @returns {string} Currency example string
+ */
+function getCurrencyExample(currency = null) {
+  const format = getCurrencyFormat(currency);
+  return format.example || formatCurrency(20, currency);
+}
+
+/**
+ * Get language configuration for a specific language
+ * @param {string} language - The language code (optional, uses current locale if not provided)
+ * @returns {Object} Language configuration
+ */
+function getLanguageConfig(language = null) {
+  const currentLanguage = language || LOCALE_CONFIG.language;
+  return LOCALE_CONFIG.languageConfig[currentLanguage] || LOCALE_CONFIG.languageConfig.vi;
+}
+
+/**
+ * Get current language instruction
+ * @param {string} language - The language code (optional, uses current locale if not provided)
+ * @returns {string} Language instruction string
+ */
+function getLanguageInstruction(language = null) {
+  const config = getLanguageConfig(language);
+  return config.languageInstruction;
+}
+
+/**
+ * Get current date format
+ * @param {string} language - The language code (optional, uses current locale if not provided)
+ * @returns {string} Date format string
+ */
+function getDateFormat(language = null) {
+  const config = getLanguageConfig(language);
+  return config.dateFormat;
+}
+
+/**
+ * Get current time format
+ * @param {string} language - The language code (optional, uses current locale if not provided)
+ * @returns {string} Time format string
+ */
+function getTimeFormat(language = null) {
+  const config = getLanguageConfig(language);
+  return config.timeFormat;
+}
+
+/**
+ * Format number with locale-specific separators
+ * @param {number} number - The number to format
+ * @param {string} currency - The currency code (optional, uses current locale if not provided)
+ * @returns {string} Formatted number string
+ */
+function formatNumber(number, currency = null) {
+  try {
+    const format = getCurrencyFormat(currency);
+    const { thousandsSeparator, decimalSeparator, decimals } = format;
+    
+    // Round to specified decimal places
+    const roundedNumber = Math.round(number * Math.pow(10, decimals)) / Math.pow(10, decimals);
+    
+    // Convert to string and split by decimal point
+    const numberStr = roundedNumber.toString();
+    const parts = numberStr.split('.');
+    
+    // Format integer part with thousands separator
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
+    
+    // Handle decimal part
+    let decimalPart = '';
+    if (decimals > 0 && parts.length > 1) {
+      decimalPart = decimalSeparator + parts[1].padEnd(decimals, '0').substring(0, decimals);
+    } else if (decimals > 0 && parts.length === 1) {
+      decimalPart = decimalSeparator + '0'.repeat(decimals);
+    }
+    
+    return integerPart + decimalPart;
+  } catch (error) {
+    Logger.log(`Error formatting number: ${error.toString()}`);
+    return number.toString();
+  }
+}
+
+/**
  * Format currency amount based on locale
  * @param {number} amount - The amount to format
- * @param {string} locale - The locale (EUR, VND, etc.)
+ * @param {string} currency - The currency code (optional, uses current locale if not provided)
  * @returns {string} Formatted currency string
  */
-function formatCurrency(amount, locale = 'EUR') {
+function formatCurrency(amount, currency = null) {
   try {
-    switch (locale.toUpperCase()) {
-      case 'EUR':
-        return `€${amount.toFixed(2)}`;
-      case 'VND':
-        return `${amount.toLocaleString('vi-VN')} VND`;
-      default:
-        return `${amount.toFixed(2)} ${locale}`;
+    const format = getCurrencyFormat(currency);
+    const { symbol, position } = format;
+    const formattedNumber = formatNumber(amount, currency);
+    
+    if (position === 'before') {
+      return `${symbol}${formattedNumber}`;
+    } else {
+      return `${formattedNumber} ${symbol}`;
     }
   } catch (error) {
     Logger.log(`Error formatting currency: ${error.toString()}`);
-    return `${amount}`;
+    return amount.toString();
+  }
+}
+
+/**
+ * Parse currency string to number
+ * @param {string} currencyString - The currency string to parse
+ * @param {string} currency - The currency code (optional, uses current locale if not provided)
+ * @returns {number} Parsed number
+ */
+function parseCurrency(currencyString, currency = null) {
+  try {
+    const format = getCurrencyFormat(currency);
+    const { symbol, thousandsSeparator, decimalSeparator } = format;
+    
+    // Remove currency symbol
+    let cleanString = currencyString.replace(new RegExp(`\\${symbol}`, 'g'), '');
+    
+    // Remove thousands separators
+    if (thousandsSeparator) {
+      cleanString = cleanString.replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '');
+    }
+    
+    // Replace decimal separator with dot for parsing
+    if (decimalSeparator && decimalSeparator !== '.') {
+      cleanString = cleanString.replace(new RegExp(`\\${decimalSeparator}`, 'g'), '.');
+    }
+    
+    return parseFloat(cleanString) || 0;
+  } catch (error) {
+    Logger.log(`Error parsing currency: ${error.toString()}`);
+    return 0;
   }
 }
 
@@ -64,35 +200,7 @@ function generateTransactionId() {
     return `TX${timestamp}${random}`;
   }
 
-/**
- * Download photo from Telegram API
- * @param {string} fileId - Telegram file ID
- * @returns {Blob} Downloaded photo blob
- */
-function getTelegramPhoto(fileId) {
-  try {
-    const telegramToken = TELEGRAM_TOKEN;
-    
-    // Get file info from Telegram
-    const fileInfoUrl = `https://api.telegram.org/bot${telegramToken}/getFile?file_id=${fileId}`;
-    const fileInfoResponse = UrlFetchApp.fetch(fileInfoUrl);
-    const fileInfo = JSON.parse(fileInfoResponse.getContentText());
-    
-    if (!fileInfo.ok) {
-      throw new Error(`Failed to get file info: ${fileInfo.description}`);
-    }
-    
-    // Download the file
-    const fileUrl = `https://api.telegram.org/file/bot${telegramToken}/${fileInfo.result.file_path}`;
-    const fileResponse = UrlFetchApp.fetch(fileUrl);
-    
-    return fileResponse.getBlob();
-    
-  } catch (error) {
-    Logger.log(`Error downloading Telegram photo: ${error.toString()}`);
-    throw new Error(`Failed to download photo: ${error.toString()}`);
-  }
-}
+
 
 //--------- TELEGRAM BUTTON UTILITIES --------------//
 
@@ -362,16 +470,18 @@ function convertToMarkdownV2(text) {
   specialChars.forEach(char => {
     // Create a regex that matches the character if it's not already escaped
     // Use a simpler approach that works in all JavaScript environments
-    const regex = new RegExp(`([^\\\\])${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+    const escapedChar = char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`([^\\\\])${escapedChar}`, 'g');
     converted = converted.replace(regex, `$1\\${char}`);
     
     // Also handle characters at the beginning of the string
-    const startRegex = new RegExp(`^${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+    const startRegex = new RegExp(`^${escapedChar}`, 'g');
     converted = converted.replace(startRegex, `\\${char}`);
   });
   
   return converted;
 }
+
 
 /**
  * Format a message for Telegram MarkdownV2 with proper escaping
