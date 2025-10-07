@@ -2,7 +2,7 @@
 //mỗi hàm trả về object với structure: { success: boolean, messages: string[], logs: string[] }
 
 //dispatcher chính để xử lý tất cả các intent
-function handleIntent(intentObj, originalText, replyText) {
+function handleIntent(intentObj, originalText, replyText, projectContext = null) {
   const intent = intentObj.intent;
 
   try {
@@ -36,6 +36,18 @@ function handleIntent(intentObj, originalText, replyText) {
 
       case "search":
         return handleSearch(intentObj);
+
+      case "projectTx":
+        return handleProjectTransaction(intentObj, projectContext);
+
+      case "projectBudget":
+        return handleProjectBudget(intentObj);
+
+      case "projectBalance":
+        return handleProjectBalance(intentObj);
+
+      case "projectReport":
+        return handleProjectReport(intentObj);
 
       case "others":
       default:
@@ -593,6 +605,100 @@ function handleReceiptPhoto(fileId, userMessage = "") {
     return {
       success: false,
       error: `Lỗi khi xử lý ảnh hóa đơn: ${error.toString()}`
+    };
+  }
+}
+
+//---------------PROJECT MODE HANDLERS-------------------//
+
+//xử lý intent projectTx - thêm giao dịch dự án
+function handleProjectTransaction(intentObj, projectContext) {
+  try {
+    if (!projectContext) {
+      return {
+        success: false,
+        messages: ["❌ Project context not available. Please try again."],
+        logs: ["Project context missing in handleProjectTransaction"]
+      };
+    }
+
+    // Use the project transaction handler from projects.js
+    const result = handleProjectTransactionFromProjects(intentObj, projectContext);
+    
+    if (!result.success) {
+      return {
+        success: false,
+        messages: result.messages || [result.error || "Unknown error"],
+        logs: result.logs || [`Error in project transaction: ${result.error}`]
+      };
+    }
+
+    return {
+      success: true,
+      messages: result.messages,
+      logs: result.logs,
+      replyMarkup: result.replyMarkup
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi xử lý giao dịch dự án: ${error.toString()}`],
+      logs: [`Error in handleProjectTransaction: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent projectBudget - xem dự toán dự án
+function handleProjectBudget(intentObj) {
+  try {
+    return {
+      success: false,
+      messages: ["❌ Project budget not implemented yet."],
+      logs: ["Project budget handler called but not implemented"]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi xử lý dự toán dự án: ${error.toString()}`],
+      logs: [`Error in handleProjectBudget: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent projectBalance - xem số dư dự án
+function handleProjectBalance(intentObj) {
+  try {
+    return {
+      success: false,
+      messages: ["❌ Project balance not implemented yet."],
+      logs: ["Project balance handler called but not implemented"]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi xử lý số dư dự án: ${error.toString()}`],
+      logs: [`Error in handleProjectBalance: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent projectReport - báo cáo dự án
+function handleProjectReport(intentObj) {
+  try {
+    return {
+      success: false,
+      messages: ["❌ Project report not implemented yet."],
+      logs: ["Project report handler called but not implemented"]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi xử lý báo cáo dự án: ${error.toString()}`],
+      logs: [`Error in handleProjectReport: ${error.toString()}`]
     };
   }
 }

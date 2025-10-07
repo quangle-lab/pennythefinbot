@@ -79,8 +79,24 @@ function checkTelegramMessages() {
       }
     }
 
+    // Step 0: Check for project mode (POC Project Mode)
+    const projectResult = processProjectMode(replyText, originalText, replyText);
+    
     // Step 1: Detect user intent using OpenAI
-    const interpretation = detectUserIntent (originalText, replyText);
+    let interpretation;
+    if (projectResult.isProjectMode && projectResult.isProjectValid && projectResult.isProjectActive) {
+      // Use project-specific intent detection
+      interpretation = detectProjectIntent(originalText, replyText, projectResult);
+    } else if (projectResult.isProjectMode && (!projectResult.isProjectValid || !projectResult.isProjectActive)) {
+      // Project mode detected but invalid/inactive
+      const errorMessage = `❌ Dự án không hợp lệ hoặc không hoạt động: ${projectResult.error}`;
+      sendTelegramMessage(errorMessage);
+      props.setProperty("telegram_lastUpdateId", update.update_id.toString());
+      continue;
+    } else {
+      // Normal mode - use existing intent detection
+      interpretation = detectUserIntent(originalText, replyText);
+    }
     sendLog(interpretation);
 
     if (!interpretation || !interpretation.intents) {
@@ -109,7 +125,14 @@ function checkTelegramMessages() {
 
       try {
         // Step 3: Call action handler for each intent
-        const actionResult = handleIntent(intentObj, originalText, replyText);
+        let actionResult;
+        if (projectResult.isProjectMode && projectResult.isProjectValid && projectResult.isProjectActive) {
+          // Pass project context for project intents
+          actionResult = handleIntent(intentObj, originalText, replyText, projectResult);
+        } else {
+          // Normal mode - no project context
+          actionResult = handleIntent(intentObj, originalText, replyText);
+        }
 
         // Collect messages and logs
         if (actionResult.messages && actionResult.messages.length > 0) {
@@ -217,7 +240,7 @@ function sendLog (message) {
 function sendWeeklyReport () {
   var monthText = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/yyyy");  
   const monthDashboardPrompt = generateExpenseAnalyticsPrompt("This is the automatic weekly report", monthText, "dashboard");
-  const message = analyseDataWithOpenAI(monthDashboardPrompt);
+  const message = analyseData(monthDashboardPrompt);
   sendTelegramMessage (message);
 }
 

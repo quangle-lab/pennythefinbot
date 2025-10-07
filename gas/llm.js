@@ -249,6 +249,51 @@ function resetConversationIfNeeded(forceReset = false) {
   return false;
 }
 
+//--------- PROJECT INTENT DETECTION --------------//
+//xác định ý định trong chế độ dự án (POC Project Mode)
+function detectProjectIntent(originalText, replyText, projectInfo) {
+  const apiKey = OPENAI_TOKEN;
+
+  // Check if we need to reset conversation (new topic detection)
+  resetConversationIfNeeded();
+
+  // Log current conversation context for debugging
+  logConversationContext();
+
+  //build the project-specific prompt
+  const promptData = generateProjectIntentDetectionPrompt(originalText, replyText, projectInfo);
+
+  // Create payload with conversation context
+  const payload = createOpenAIPayload(promptData.systemMessage, promptData.userMessage, 0.6, false, "gpt-4.1");
+
+  const options = {
+    method: "POST",
+    contentType: "application/json",
+    headers: {
+      Authorization: `Bearer ${apiKey}`
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", options);
+  Logger.log (response);
+
+  const json = JSON.parse(response.getContentText());
+  const content = json.output[0].content[0].text;
+
+  // Update conversation context
+  updateConversationContext(json.id, 'project_intent_detection');
+
+  Logger.log (content);
+
+  try {
+    return JSON.parse(content);
+  } catch (e) {
+    return {intent: "unknown"};
+  }
+}
+
 //--------- RECEIPT PHOTO ANALYSIS --------------//
 //phân tích ảnh hóa đơn để trích xuất thông tin giao dịch
 function analyzeReceiptPhoto(base64Image, userMessage = "") {

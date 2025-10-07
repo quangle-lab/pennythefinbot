@@ -55,9 +55,14 @@ function getCurrencyFormat(currency = null) {
  * @param {string} currency - The currency code (optional, uses current locale if not provided)
  * @returns {string} Currency example string
  */
-function getCurrencyExample(currency = null) {
-  const format = getCurrencyFormat(currency);
-  return format.example || formatCurrency(20, currency);
+function getInputCurrencyExample(currency = null) {  
+  const format = getCurrencyFormat(currency);  
+  return format.input_example || formatCurrency(20, currency);
+}
+
+function getOutputCurrencyExample(currency = null) {  
+  const format = getCurrencyFormat(currency);  
+  return format.output_example || formatCurrency(20, currency);
 }
 
 /**

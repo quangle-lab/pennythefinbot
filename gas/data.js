@@ -1616,3 +1616,192 @@ function getBudgetInstructions() {
   let contextPrompt = parts.join("\n");  
   return contextPrompt;
 }
+
+//---------------PROJECT MODE SUPPORT-------------------//
+
+/**
+ * Initialize project metadata sheet if it doesn't exist
+ * @returns {Object} Result of initialization
+ */
+function initializeProjectMetadataSheet() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let projectMetadataSheet = ss.getSheetByName('project_metadata');
+    
+    if (!projectMetadataSheet) {
+      // Create the project metadata sheet
+      projectMetadataSheet = ss.insertSheet('project_metadata');
+      
+      // Add headers
+      const headers = [
+        'ID',
+        'Name', 
+        'Description',
+        'Type',
+        'Hashtag',
+        'From Date',
+        'To Date',
+        'Note'
+      ];
+      
+      projectMetadataSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      
+      // Format headers
+      const headerRange = projectMetadataSheet.getRange(1, 1, 1, headers.length);
+      headerRange.setFontWeight('bold');
+      headerRange.setBackground('#f0f0f0');
+      
+      Logger.log('Project metadata sheet created successfully');
+      
+      return {
+        success: true,
+        message: 'Project metadata sheet created successfully',
+        sheet: projectMetadataSheet
+      };
+    }
+    
+    return {
+      success: true,
+      message: 'Project metadata sheet already exists',
+      sheet: projectMetadataSheet
+    };
+    
+  } catch (error) {
+    Logger.log(`Error initializing project metadata sheet: ${error.toString()}`);
+    return {
+      success: false,
+      error: `Error initializing project metadata sheet: ${error.toString()}`,
+      sheet: null
+    };
+  }
+}
+
+/**
+ * Create a new project entry in the metadata sheet
+ * @param {Object} projectData - Project data object
+ * @returns {Object} Result of project creation
+ */
+function createProject(projectData) {
+  try {
+    const { name, description, type, hashtag, fromDate, toDate, note } = projectData;
+    
+    // Initialize sheet if needed
+    const initResult = initializeProjectMetadataSheet();
+    if (!initResult.success) {
+      return initResult;
+    }
+    
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const projectMetadataSheet = ss.getSheetByName('project_metadata');
+    
+    // Generate project ID
+    const projectId = generateProjectId();
+    
+    // Add project to metadata sheet
+    projectMetadataSheet.appendRow([
+      projectId,
+      name,
+      description || '',
+      type || 'general',
+      hashtag,
+      fromDate || new Date(),
+      toDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default to 30 days from now
+      note || ''
+    ]);
+    
+    Logger.log(`Project created: ${name} (${hashtag})`);
+    
+    return {
+      success: true,
+      message: `Project '${name}' created successfully`,
+      projectId: projectId,
+      projectData: projectData
+    };
+    
+  } catch (error) {
+    Logger.log(`Error creating project: ${error.toString()}`);
+    return {
+      success: false,
+      error: `Error creating project: ${error.toString()}`
+    };
+  }
+}
+
+/**
+ * Generate a unique project ID
+ * @returns {string} Unique project ID
+ */
+function generateProjectId() {
+  const timestamp = new Date().getTime().toString();
+  const random = Math.random().toString(36).substr(2, 5);
+  return `PROJ_${timestamp}_${random}`;
+}
+
+/**
+ * Get all active projects
+ * @returns {Object} Active projects result
+ */
+function getActiveProjects() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const projectMetadataSheet = ss.getSheetByName('project_metadata');
+    
+    if (!projectMetadataSheet) {
+      return {
+        success: false,
+        error: 'Project metadata sheet not found',
+        projects: []
+      };
+    }
+    
+    const data = projectMetadataSheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return {
+        success: true,
+        projects: [],
+        message: 'No projects found'
+      };
+    }
+    
+    const currentDate = new Date();
+    const activeProjects = [];
+    
+    // Skip header row
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const fromDate = row[5] ? new Date(row[5]) : null;
+      const toDate = row[6] ? new Date(row[6]) : null;
+      
+      // Check if project is currently active
+      const isActive = (!fromDate || currentDate >= fromDate) && 
+                      (!toDate || currentDate <= toDate);
+      
+      if (isActive) {
+        activeProjects.push({
+          id: row[0],
+          name: row[1],
+          description: row[2],
+          type: row[3],
+          hashtag: row[4],
+          from: fromDate,
+          to: toDate,
+          note: row[7]
+        });
+      }
+    }
+    
+    return {
+      success: true,
+      projects: activeProjects,
+      count: activeProjects.length
+    };
+    
+  } catch (error) {
+    Logger.log(`Error getting active projects: ${error.toString()}`);
+    return {
+      success: false,
+      error: `Error getting active projects: ${error.toString()}`,
+      projects: []
+    };
+  }
+}
