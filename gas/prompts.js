@@ -32,7 +32,7 @@ function generateBankBalanceClassificationPrompt(subject, body) {
   - Bước 2: Kiểm tra nội dung email có chứa thông tin về số dư tài khoản không
       - Tìm các từ khóa: "solde", "balance", "compte", "account", "soldes", "balances"
       - Tìm số tài khoản: thường có định dạng "Compte n°X0371 XXXXXX509 01"
-      - Tìm số tiền số dư (format: ${getCurrencyExample()})
+      - Tìm số tiền giao dịch hoặc số dư tài khoản có định dạng ${getInputCurrencyExample()}
   - Bước 3: Nếu là thông báo số dư tài khoản, trả về intent "UpdateBankBalance"
   - Bước 4: Nếu là thông báo giao dịch thông thường, trả về intent "AddTx"
   - Bước 5: Trả về thông tin chi tiết theo cấu trúc JSON
@@ -44,7 +44,7 @@ function generateBankBalanceClassificationPrompt(subject, body) {
     {
       "intent": "UpdateBankBalance",
       "accountNumber": "số tài khoản ngân hàng, chỉ trả 5 số cuối và bao gồm khoảng trắng, ví dụ 509 01",
-      "balance": "số dư tài khoản theo định dạng ${getCurrencyExample()}",
+      "balance": "số dư tài khoản theo định dạng, ví dụ 1000.00, 55.60
       "date": "ngày cập nhật số dư theo định dạng DD/MM/YYYY",
       "group": "tên nhóm tương ứng với tài khoản, dùng đúng tên nhóm kèm emoji (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục tiêu, Tiết kiệm)"
     }
@@ -56,8 +56,9 @@ function generateBankBalanceClassificationPrompt(subject, body) {
       "category": "mục theo đúng tên mục như mô tả",
       "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
       "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
+      "currency": "the currency of the transaction, under the ISO format VND, USD, EUR, GBP, etc.", 
       "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
-      "amount": "số tiền giao dịch theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết)",
+      "amount": "số tiền giao dịch theo định dạng XXXX.XX (bỏ dấu + hay - nếu cần thiết), ví dụ 1000.00, 55.60",
       "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
       "bankcomment": "trích chú thích Ngân hàng, chỉ ghi thông tin địa điểm phát sinh giao dịch"
     }
@@ -125,11 +126,11 @@ function generateIntentDetectionPrompt (originalText, replyText) {
     - addTx: thêm thủ công 1 giao dịch mới
     - modifyTx: cập nhật dòng giao dịch (số tiền, ngày chi, miêu tả, mục trong cùng nhóm) hoặc chuyển dòng qua nhóm và mục mới. Dùng đúng tên Nhóm và mục như trong Các mục giao dịch
       - Ví dụ 1
-        - Tin gốc: "Thu ${getCurrencyExample()} cho Hoàn tiền bảo hiểm GENERATION ✏️Ghi vào 🛟Quỹ gia đình, mục 🚰Thu, dòng 25".
+        - Tin gốc: "Thu ${getInputCurrencyExample()} cho Hoàn tiền bảo hiểm GENERATION ✏️Ghi vào 🛟Quỹ gia đình, mục 🚰Thu, dòng 25".
         - Phản hồi của khách hàng: đây là chinh phí bảo hiểm sức khỏe.
         - Ý định: phân loại sai. Cần chuyển từ Nhóm Quỹ gia đình > Thu sang Chi phí cố định > BH sức khỏe.
       - Ví dụ 2
-        - Tin gốc: "💸Chi ${getCurrencyExample()} cho Đặt đồ ăn UBER EATS ✏️Ghi vào 🛒Chi phí biến đổi, mục Chợ, dòng 102".
+        - Tin gốc: "💸Chi ${getInputCurrencyExample()} cho Đặt đồ ăn UBER EATS ✏️Ghi vào 🛒Chi phí biến đổi, mục Chợ, dòng 102".
         - Phản hồi của khách hàng: này là tiền ăn ngoài.
         - Ý định: phân loại sai. Cần chuyển từ mục Chợ thành Ăn ngoài.
     - deleteTx: xóa dòng giao dịch           
@@ -143,8 +144,8 @@ function generateIntentDetectionPrompt (originalText, replyText) {
     - addNewBudget: tạo dự toán cho tháng mới hoặc dự án mới        
     - modifyBudget: cập nhật dự toán dự trên thông tin bạn đề nghị
         - Ví dụ 1
-          - Tin gốc: "Tăng mục Ăn ngoài lên ${getCurrencyExample()} cho tháng tới"            
-          - Ý định: cần tăng mục Ăn ngoài lên ${getCurrencyExample()} cho tháng tới
+          - Tin gốc: "Tăng mục Ăn ngoài lên ${getInputCurrencyExample()} cho tháng tới"            
+          - Ý định: cần tăng mục Ăn ngoài lên ${getInputCurrencyExample()} cho tháng tới
         - Ví dụ 2
           - Tin gốc: "Giảm mục Xe hơi xuống 0"            
           - Ý định: cần giảm mục Xe hơi xuống 0 cho tháng tới
@@ -200,9 +201,10 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "tab":"tên nhóm phân loại hiện tại, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji",
         "newtab": "tên nhóm mới nếu khách hàng yêu cầu chuyển giao dịch qua nhóm mới. Tuân thủ tuyệt đối đúng tên nhóm như trong danh sách, cả chữ lẫn emoji. Trả về rỗng nếu chỉ cầp cập nhật thông tin giao dịch như miêu tả, số tiền, mục trong cùng nhóm",
         "date":"ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
+        "currency": "the currency of the transaction, under the ISO format VND, USD, EUR, GBP, etc.", 
         "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi', chỉ áp dụng cho intent 'addTx' hoặc 'modifyTx'",
         "desc":"miêu tả về giao dịch, ngắn gọn, tối đa 30 ký tự, dựa trên miêu tả cũ và yêu cầu của khách hàng",
-        "amount":"số tiền giao dịch theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết)",
+        "amount":"số tiền giao dịch theo định dạng XXXX.XX (bỏ dấu + hay - nếu cần thiết), ví dụ 1000.00, 55.60",
         "location":"nơi phát sinh giao dịch. 3 giá trị thường gặp là Rennes, Nantes, N/A",
         "category":"mục phân loại, tuân thủ tuyệt đối tên mục trong chỉ dẫn phân loại,cả chữ lẫn emoji",
         "comment": 1 trong 2 giá trị dưới đây nếu chưa có lời ghi chú, nếu có lời ghi chú rồi thì giữ nguyên không thay đổi
@@ -229,7 +231,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
           {
             "group":"nhóm dự toán". Sử dụng tên nhóm như trong Chỉ dẫn phân loại, bao gồm cả emoji.
             "category":"mục trong từng nhóm". Sử dụng đúng tên mục như trong Chỉ dẫn phân loại bao gồm cả emoji.
-            "amount":"số tiền dự toán theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết), số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
+            "amount":"số tiền dự toán theo định dạng XXXX.XX (bỏ dấu + hay - nếu cần thiết), số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
             "ghi chú":"ghi chú của khách hàng về mục dự toán này cho tháng"
           }
         ]
@@ -248,7 +250,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "consultType":"affordability hoặc coaching hoặc general",
         "question":"câu hỏi hoặc yêu cầu tư vấn của khách hàng",
         "item":"(chỉ cho affordability) tên món đồ hoặc khoản chi tiêu khách hàng muốn mua/chi trả",
-        "amount":"(chỉ cho affordability) số tiền dự kiến chi theo định dạng ${getCurrencyExample()}",
+        "amount":"(chỉ cho affordability) số tiền dự kiến chi theo định dạng XXXX.XX",
         "category":"(chỉ cho affordability) mục phân loại dự kiến cho khoản chi này theo danh sách categories",
         "group":"(chỉ cho affordability) nhóm phân loại dự kiến cho khoản chi này",
         "timeframe":"(chỉ cho affordability) thời gian dự kiến chi trả (ngay lập tức, tháng này, tháng tới, quý này, năm này, etc.)",
@@ -723,9 +725,10 @@ function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
     "tab": "tên nhóm cần thêm giao dịch đúng như trong danh sách, bao gồm tên và emoji",
     "category": "mục theo đúng tên mục như mô tả",
     "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi'",
+    "currency": "the currency of the transaction, under the ISO format VND, USD, EUR, GBP, etc.", 
     "date": "ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
     "desc": "ghi chú về giao dịch, ngắn gọn, tối đa 30 ký tự",
-    "amount": "số tiền giao dịch theo định dạng ${getCurrencyExample()} (bỏ dấu + hay - nếu cần thiết)",
+    "amount": "số tiền giao dịch theo định dạng XXXX.XX} (bỏ dấu + hay - nếu cần thiết)",
     "location": "thành phố nơi phát sinh giao dịch, nếu không đoán được thì ghi N/A",
     "comment": "từ ảnh hóa đơn"
   }
@@ -742,4 +745,151 @@ function generateReceiptAnalysisPrompt(base64Image, userMessage = "") {
     userMessage: mainPrompt,
     image: base64Image
   };
+}
+
+//prompt phân tích ý định người sử dụng trong chế độ dự án 
+function generateProjectIntentDetectionPrompt(originalText, replyText, projectInfo) {
+  if (originalText) {
+    userText = `Tin nhắn của bạn: ${originalText}\nPhản hồi của khách hàng: ${replyText}`
+  }
+  else userText = `Yêu cầu của khách hàng: ${replyText}`
+
+  //tạo prompt hoàn cảnh gia đình, chỉ dẫn phân loại, chỉ dẫn dự toán và dự toán cho tháng hiện tại
+  const familyContext = getFamilyContext()
+  const categoriseInstructions = getCategoriseInstructions()
+  const budgetInstructions = getBudgetInstructions()
+  const categories = getTxCat()
+
+  const currentTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm dd/MM/yyyy");
+  
+  // Get project-specific categories
+  const projectCategoriesResult = getProjectCategories(projectInfo.hashtag);
+  const projectCategories = projectCategoriesResult.success ? projectCategoriesResult.categories : [];
+
+  // Get project locations
+  const projectLocationsResult = getProjectLocation(projectInfo.hashtag);
+  const projectLocations = projectLocationsResult.success ? projectLocationsResult.locations : [];
+
+  // Get project budget
+  const projectBudgetResult = getProjectBudget(projectInfo.hashtag);
+  const projectBudget = projectBudgetResult.success ? projectBudgetResult.budget : [];
+
+  let projectIntentDetectionPrompt = `  
+  # Identity  
+  The current time is ${currentTime}. The date format is ${getDateFormat()}.
+
+  Bạn là chuyên gia tư vấn tài chính cá nhân đang trao đổi với khách hàng của mình qua mail và Telegram.  
+  Hãy trò chuyện với khách hàng 1 cách thân thiện và tích cực, dùng emoji vừa phải để sinh động hơn.
+  
+  # Language Instructions
+  ${getLanguageInstruction()}   
+  
+  # CHẾ ĐỘ DỰ ÁN
+  Hiện tại bạn đang làm việc trong chế độ dự án: *${projectInfo.project.name}* (${projectInfo.hashtag})
+  - Loại dự án: ${projectInfo.project.type}
+  - Mô tả: ${projectInfo.project.description}
+  - Thời gian: ${projectInfo.project.from ? Utilities.formatDate(projectInfo.project.from, Session.getScriptTimeZone(), "dd/MM/yyyy") : 'Không xác định'} - ${projectInfo.project.to ? Utilities.formatDate(projectInfo.project.to, Session.getScriptTimeZone(), "dd/MM/yyyy") : 'Không xác định'}
+  - Ghi chú: ${projectInfo.project.note || 'Không có'}
+  
+  # Nội dung trao đổi 
+  Đây là nội dung trao đổi giữa bạn và khách hàng: "${userText}", 
+  
+  # Hướng dẫn
+  Luôn luôn tuân thủ tuyệt đối tên của nhóm và mục trong các chỉ dẫn sau đây, bao gồm cả tên và emoji.
+  ${familyContext}      
+
+  ## Danh mục dự án
+  ${projectCategories.length > 0 ? 
+    projectCategories.map(cat => `- ${cat.name}: ${cat.description}`).join('\n') : 
+    'Chưa có danh mục dự án được định nghĩa'}
+
+  ## Địa điểm dự án
+  ${projectLocations.length > 0 ? 
+    projectLocations.map(loc => `- ${loc.name}: ${loc.description}`).join('\n') : 
+    'Chưa có địa điểm dự án được định nghĩa'}
+
+  ## Tin nhắn nhiều ý định
+  Trong một tin nhắn của khách hàng có thể có nhiều ý định: thêm giao dịch, xem dự toán, xem số dư, xem báo cáo, các intent khác. 
+  Hãy xác định tất cả các ý định trong tin nhắn và trả lời cho khách hàng.
+  
+  ## Danh sách ý định trong chế độ dự án
+  Dựa vào nội dung trao đổi và thông tin dự án, hãy xác định xem ý định (intent) của khách hàng dựa trên danh sách sau
+    - addTx: thêm giao dịch mới cho dự án ${projectInfo.project.name}
+      - Ví dụ: "Chi 500 ${getCurrentLocale().currency} cho khách sạn", "Thu 100 ${getCurrentLocale().currency} từ hoàn tiền"
+    - modifyTx: chỉnh sửa giao dịch hiện có trong dự án (yêu cầu có ID giao dịch)
+      - Ví dụ: "Sửa giao dịch ID123 thành 600 ${getCurrentLocale().currency}", "Đổi mục của ID456 thành Ăn uống"
+    - deleteTx: xóa giao dịch khỏi dự án (yêu cầu có ID giao dịch)
+      - Ví dụ: "Xóa giao dịch ID789", "Xóa cái ID123"
+    - projectBudget: xem dự toán của dự án
+    - projectBalance: xem số dư dự án
+    - projectReport: báo cáo chi tiêu của dự án
+    - others: các intent khác, kèm theo ghi chú trong mục note
+      Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ.
+
+  ## Dự toán dự án
+  ${projectBudget.length > 0 ? 
+    projectBudget.map(budget => `- ${budget.category}: ${formatCurrency(budget.amount)}`).join('\n') : 
+    'Chưa có dự toán dự án được định nghĩa'}
+          
+  ## Cấu trúc phản hồi
+  Cho mỗi intent, trả lại JSON theo cấu trúc sau, không có dấu code block.
+  Nếu xác định được nhiều ý định, trả về 1 danh sách sau dưới dạng JSON, không có dấu code block.
+      {"intents": [
+        //mảng các intent được miêu tả dưới đây
+        {"intent": "",   }    
+      ]} 
+
+  ### Yêu cầu thêm, chỉnh sửa hoặc xóa giao dịch dự án
+    {
+      "intent":"addTx" hoặc "intent":"modifyTx" hoặc "intent":"deleteTx",
+      "project_tag":"${projectInfo.hashtag}",
+      "tab":"để rỗng cho giao dịch dự án",
+      "type": "có 2 giá trị '🤑Thu' hoặc '💸Chi', chỉ áp dụng cho intent 'addTx' hoặc 'modifyTx'",
+      "date":"ngày phát sinh giao dịch theo định dạng DD/MM/YYYY",
+      "desc":"miêu tả về giao dịch, ngắn gọn, tối đa 30 ký tự",
+      "amount":"số tiền giao dịch theo định dạng xxxxxx.00 (bỏ dấu + hay - nếu cần thiết). Ví dụ: 200.00 cho EUR hay 200000 cho VND",
+      "location":"nơi phát sinh giao dịch từ danh sách địa điểm dự án, nếu không có thì dùng 'N/A'",
+      "category":"mục phân loại từ danh mục dự án, nếu không có thì dùng 'Khác'",
+      "comment": "thêm thủ công cho dự án" cho intent "addTx", rỗng cho intent "modifyTx",
+      "transactionId":"ID của giao dịch cần cập nhật, áp dụng cho intent 'modifyTx' và 'deleteTx' (không áp dụng cho intent 'addTx')",
+      "confirmation":"tin nhắn xác nhận đã thực hiện thay đổi theo yêu cầu của khách hàng, in đậm tên dự án và mục bằng markdown. Ví dụ: '✅ Đã thêm chi phí *${getCurrentLocale().currency} XXX* cho *Khách sạn* vào dự án *${projectInfo.project.name}*'"
+    }
+
+  ### Yêu cầu xem dự toán dự án
+    {
+      "intent":"projectBudget",
+      "project_tag":"${projectInfo.hashtag}",
+      "confirmation":"tin nhắn xác nhận đã thực hiện yêu cầu của khách hàng"
+    }
+
+  ### Yêu cầu xem số dư dự án
+    {
+      "intent":"projectBalance",
+      "project_tag":"${projectInfo.hashtag}",
+      "confirmation":"tin nhắn xác nhận đã thực hiện yêu cầu của khách hàng"
+    }
+
+  ### Yêu cầu báo cáo dự án
+    {
+      "intent":"projectReport",
+      "project_tag":"${projectInfo.hashtag}",
+      "confirmation":"tin nhắn xác nhận đã thực hiện yêu cầu của khách hàng"
+    }
+
+  ### Yêu cầu khác ngoài danh sách phân loại
+    {
+      "intent":"others",
+      "reply":"câu trả lời của bạn cho khách hàng",
+      "note":"ghi chú của bạn về ý định của khách hàng để có thể hỗ trợ tốt hơn lần sau"
+    }
+    `;
+
+  return {
+   systemMessage: `      
+      The current time is ${currentTime}. The date format is ${getDateFormat()}.
+      ## PERSISTENCE
+      You are a personal finance assistant chatbot named Penny, communicating with users via Telegram. 
+      Please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+      `, 
+    userMessage: projectIntentDetectionPrompt};
 }

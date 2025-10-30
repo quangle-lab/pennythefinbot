@@ -270,22 +270,7 @@ function checkAndConfirmTransaction(transaction) {
     };
   }
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(group);
-
-  if (!sheet) {
-    return {
-      exists: false,
-      needsConfirmation: false,
-      error: `❌ Không tìm thấy sheet "${group}"`
-    };
-  }
-
-  // Get all data from the sheet
-  const data = sheet.getDataRange().getValues();
-  const timezone = Session.getScriptTimeZone();
-
-  // Parse input date for comparison
+  // Validate input date
   let inputDate;
   try {
     // Handle different date formats
@@ -308,6 +293,21 @@ function checkAndConfirmTransaction(transaction) {
     };
   }
 
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(group);
+
+  if (!sheet) {
+    return {
+      exists: false,
+      needsConfirmation: false,
+      error: `❌ Không tìm thấy sheet "${group}"`
+    };
+  }
+
+  // Get all data from the sheet
+  const data = sheet.getDataRange().getValues();
+  const timezone = Session.getScriptTimeZone();
+
   // Check for existing transactions (skip header row)
   const existingRows = [];
   for (let i = 1; i < data.length; i++) {
@@ -316,17 +316,15 @@ function checkAndConfirmTransaction(transaction) {
     const rowAmount = row[2]; // Column C: Amount
     const rowLocation = row[3]; // Column D: Location
     const rowCategory = row[4]; // Column E: Category
-    const rowBankComment = row[5]; // Column F: Bank Comment
-    const rowId = row[6]; // Column G: ID
+    const rowBankComment = row[5]; // Column F: Bank Comment    
 
     // Compare dates
     let rowDateFormatted;
     try {
-      rowDateFormatted = Utilities.formatDate(new Date(rowDate), timezone, "dd/MM/yyyy");
-      const inputDateFormatted = Utilities.formatDate(inputDate, timezone, "dd/MM/yyyy");
+      rowDateFormatted = Utilities.formatDate(new Date(rowDate), timezone, "dd/MM/yyyy");      
 
       // Check for potential duplicates based on multiple criteria
-      const dateMatch = rowDateFormatted === inputDateFormatted;
+      const dateMatch = rowDateFormatted === date;
       const amountMatch = Math.abs(parseFloat(rowAmount) - parseFloat(amount)) < 0.01; // Allow small floating point differences
       const bankCommentMatch = bankComment && rowBankComment &&
         (rowBankComment.toLowerCase().includes(bankComment.toLowerCase()) ||
@@ -340,8 +338,7 @@ function checkAndConfirmTransaction(transaction) {
           (amountMatch && bankCommentMatch)) {
         existingRows.push({
           rowNumber: i + 1,
-          date: rowDateFormatted,
-          description: rowDesc,
+          date: rowDateFormatted,          
           amount: rowAmount,
           location: rowLocation,
           category: rowCategory,
@@ -354,19 +351,8 @@ function checkAndConfirmTransaction(transaction) {
     }
   }
 
-  // Prepare transaction data
-  const transactionData = {
-    type: transaction.type || '💸Chi',
-    date: Utilities.formatDate(inputDate, timezone, "dd/MM/yyyy"),
-    description: description,
-    amount: amount,
-    location: transaction.location || 'N/A',
-    category: category || 'Khác',
-    bankComment: bankComment || ''
-  };
-
   // Always add the transaction first
-  const addResult = addConfirmedTransaction(group, transactionData);
+  const addResult = addConfirmedTransaction(group, transaction);
   
   if (!addResult.success) {
     return {
@@ -382,7 +368,7 @@ function checkAndConfirmTransaction(transaction) {
     let message = addResult.message;
     message += `\n\n🔍 *Tìm thấy ${existingRows.length} giao dịch tương tự*\:\n`;
     existingRows.forEach((row, index) => {
-      message += `\- *Dòng ${row.rowNumber}*\: ${row.date} \- ${row.description} \- ${formatCurrency(row.amount)}\n`;
+      message += `\- *Dòng ${row.rowNumber}*\: ${row.date} \- ${row.bankComment} \- ${formatCurrency(row.amount)}\n`;
     });
     message += `\n❓Bạn có muốn giữ giao dịch mới này không?`;
 
@@ -465,7 +451,7 @@ function addConfirmedTransaction(sheetName, transactionData) {
     
     return {
       success: true,
-      message: `${type} *${amount}* cho *${description}*\n _✏️${sheetName}, mục ${category}, ${remainingMessage}_\n_\(ID\: ${transactionId}\)_`,
+      message: `${type} *${formatCurrency(amount)}* cho *${description}*\n _✏️${sheetName}, mục ${category}, ${remainingMessage}_\n_\(ID\: ${transactionId}\)_`,
       rowNumber: newRowNumber,
       sheetName: sheetName,
       transactionId: transactionId,

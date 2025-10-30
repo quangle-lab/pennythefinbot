@@ -37,9 +37,6 @@ function handleIntent(intentObj, originalText, replyText, projectContext = null)
       case "search":
         return handleSearch(intentObj);
 
-      case "projectTx":
-        return handleProjectTransaction(intentObj, projectContext);
-
       case "projectBudget":
         return handleProjectBudget(intentObj);
 
@@ -66,10 +63,9 @@ function handleIntent(intentObj, originalText, replyText, projectContext = null)
 //xử lý intent addTx - thêm giao dịch
 function handleAddTransaction(intentObj) {
   try {
-    const tab = intentObj.tab;
     const dateTx = intentObj.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
-    // Prepare transaction data for addConfirmedTransaction
+    // Prepare transaction data
     const transactionData = {
       type: intentObj.type,
       date: dateTx,
@@ -79,6 +75,47 @@ function handleAddTransaction(intentObj) {
       category: intentObj.category,
       bankComment: intentObj.comment
     };
+
+    // Check if this is a project transaction
+    if (intentObj.project_tag) {
+      // Handle project transaction
+      const projectSheet = getProjectSheetByTag(intentObj.project_tag);
+      if (!projectSheet.success) {
+        return {
+          success: false,
+          messages: [`❌ ${projectSheet.error}`],
+          logs: [`Project sheet error: ${projectSheet.error}`]
+        };
+      }
+
+      // Add transaction to project sheet
+      const result = addProjectTransaction(projectSheet.sheet, transactionData, intentObj.project_tag);
+      
+      if (!result.success) {
+        return {
+          success: false,
+          messages: [result.error],
+          logs: [`Error in addProjectTransaction: ${result.error}`]
+        };
+      }
+      
+      return {
+        success: true,
+        messages: [result.message],
+        logs: [result.message],
+        replyMarkup: result.replyMarkup
+      };
+    }
+
+    // Regular transaction - use tab
+    const tab = intentObj.tab;
+    if (!tab) {
+      return {
+        success: false,
+        messages: [`❌ Thiếu thông tin nhóm giao dịch (tab).`],
+        logs: [`Missing tab for regular transaction`]
+      };
+    }
 
     // Use addConfirmedTransaction to handle the sheet operations
     const result = addConfirmedTransaction(tab, transactionData);
@@ -110,7 +147,7 @@ function handleAddTransaction(intentObj) {
 //xử lý intent modifyTx - chỉnh sửa giao dịch
 function handleModifyTransaction(intentObj, originalText, replyText) {
   try {
-    const { tab, newtab, transactionId } = intentObj;
+    const { tab, newtab, transactionId, project_tag } = intentObj;
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
     if (!transactionId) {
@@ -118,6 +155,57 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
         success: false,
         messages: [`❌ Thiếu ID giao dịch để thực hiện cập nhật.`],
         logs: [`Missing transaction ID for modification`]
+      };
+    }
+
+    // Check if this is a project transaction
+    if (project_tag) {
+      // Handle project transaction modification
+      const findResult = findProjectTransactionById(project_tag, transactionId);
+
+      if (!findResult.success) {
+        return {
+          success: false,
+          messages: [`❌ ${findResult.error}`],
+          logs: [`Project transaction not found: ${transactionId}`]
+        };
+      }
+
+      const current = findResult.rowData;
+
+      // Update project transaction
+      const updateResult = updateProjectTransactionById(project_tag, transactionId, {
+        date: intentObj.date || current.date,
+        description: intentObj.desc || current.description,
+        amount: intentObj.amount || current.amount,
+        location: intentObj.location || current.location,
+        category: intentObj.category || current.category,
+        bankComment: intentObj.comment || current.bankComment
+      });
+
+      if (!updateResult.success) {
+        return {
+          success: false,
+          messages: [`❌ ${updateResult.error}`],
+          logs: [`Project update failed: ${updateResult.error}`]
+        };
+      }
+
+      const confirmation = `✅ ${intentObj.confirmation}\n_\(ID\: ${transactionId}\)_`;
+
+      return {
+        success: true,
+        messages: [confirmation],
+        logs: [intentObj.confirmation || `Project transaction updated: ${transactionId}`]
+      };
+    }
+
+    // Regular transaction modification
+    if (!tab) {
+      return {
+        success: false,
+        messages: [`❌ Thiếu thông tin nhóm giao dịch (tab).`],
+        logs: [`Missing tab for regular transaction modification`]
       };
     }
 
@@ -213,7 +301,7 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
 
     return {
       success: true,
-      messages: confirmation,
+      messages: [confirmation],
       logs: [intentObj.confirmation || `Transaction updated: ${transactionId}`]
     };
 
@@ -229,13 +317,44 @@ function handleModifyTransaction(intentObj, originalText, replyText) {
 //xử lý intent deleteTx - xóa giao dịch
 function handleDeleteTransaction(intentObj) {
   try {
-    const { tab, transactionId } = intentObj;
+    const { tab, transactionId, project_tag } = intentObj;
 
     if (!transactionId) {
       return {
         success: false,
         messages: [`❌ Thiếu ID giao dịch để thực hiện xóa.`],
         logs: [`Missing transaction ID for deletion`]
+      };
+    }
+
+    // Check if this is a project transaction
+    if (project_tag) {
+      // Handle project transaction deletion
+      const deleteResult = deleteProjectTransactionById(project_tag, transactionId);
+
+      if (!deleteResult.success) {
+        return {
+          success: false,
+          messages: [`❌ ${deleteResult.error}`],
+          logs: [`Project delete failed: ${deleteResult.error}`]
+        };
+      }
+
+      const message = intentObj.confirmation || `🗑️ Đã xoá giao dịch dự án ID\: ${transactionId}`;
+
+      return {
+        success: true,
+        messages: [message],
+        logs: [message]
+      };
+    }
+
+    // Regular transaction deletion
+    if (!tab) {
+      return {
+        success: false,
+        messages: [`❌ Thiếu thông tin nhóm giao dịch (tab).`],
+        logs: [`Missing tab for regular transaction deletion`]
       };
     }
 
@@ -610,44 +729,6 @@ function handleReceiptPhoto(fileId, userMessage = "") {
 }
 
 //---------------PROJECT MODE HANDLERS-------------------//
-
-//xử lý intent projectTx - thêm giao dịch dự án
-function handleProjectTransaction(intentObj, projectContext) {
-  try {
-    if (!projectContext) {
-      return {
-        success: false,
-        messages: ["❌ Project context not available. Please try again."],
-        logs: ["Project context missing in handleProjectTransaction"]
-      };
-    }
-
-    // Use the project transaction handler from projects.js
-    const result = handleProjectTransactionFromProjects(intentObj, projectContext);
-    
-    if (!result.success) {
-      return {
-        success: false,
-        messages: result.messages || [result.error || "Unknown error"],
-        logs: result.logs || [`Error in project transaction: ${result.error}`]
-      };
-    }
-
-    return {
-      success: true,
-      messages: result.messages,
-      logs: result.logs,
-      replyMarkup: result.replyMarkup
-    };
-
-  } catch (error) {
-    return {
-      success: false,
-      messages: [`❌ Lỗi khi xử lý giao dịch dự án: ${error.toString()}`],
-      logs: [`Error in handleProjectTransaction: ${error.toString()}`]
-    };
-  }
-}
 
 //xử lý intent projectBudget - xem dự toán dự án
 function handleProjectBudget(intentObj) {

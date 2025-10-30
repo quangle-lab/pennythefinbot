@@ -46,8 +46,12 @@ function getCurrentLocale() {
  * @returns {Object} Currency format configuration
  */
 function getCurrencyFormat(currency = null) {
-  const currentCurrency = currency || LOCALE_CONFIG.currency;
+  const currentCurrency = currency || LOCALE_CONFIG.default_currency;
   return LOCALE_CONFIG.currencyFormat[currentCurrency] || LOCALE_CONFIG.currencyFormat.EUR;
+}
+
+function convertAmountToDefaultCurrency(amount, currency = null) {
+  //to be completed
 }
 
 /**

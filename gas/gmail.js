@@ -7,87 +7,89 @@ function processBankAlerts() {
     const messages = thread.getMessages();
 
     for (let message of messages) {    
-      // Trích xuất thông tin tựa và nội dung từ email
-      let body = trimCICMailBody(message.getPlainBody());
-      const subject = message.getSubject();    
+      // Trích xuất thông tin tựa và nội dung từ email nếu email chưa được xử lý (starred)
+      if (!message.isStarred()) {
+        let body = trimCICMailBody(message.getPlainBody());
+        const subject = message.getSubject();    
 
-      //xóa các ký tự đặc biệt
-      body = body.replace(/[*&]/g, ' ');
+        //xóa các ký tự đặc biệt
+        body = body.replace(/[*&]/g, ' ');
 
-      Logger.log (subject);
-      Logger.log (body);
+        Logger.log (subject);
+        Logger.log (body);
 
-      // Gọi OpenAI để phân loại thông minh - có thể là giao dịch hoặc cập nhật số dư
-      const aiResult = classifyBankBalance(subject, body);
+        // Gọi OpenAI để phân loại thông minh - có thể là giao dịch hoặc cập nhật số dư
+        const aiResult = classifyBankBalance(subject, body);
 
-      // Kiểm tra intent từ kết quả AI
-      if (aiResult.intent === 'UpdateBankBalance') {
-        // Xử lý cập nhật số dư tài khoản
-        const { accountNumber, balance, date, group } = aiResult;
-        
-        if (!accountNumber || !balance) {
-          Logger.log(`Thiếu thông tin số dư tài khoản: ${subject}`);
-          message.star();
-          message.markRead();
-          continue;
-        }
-
-        // Cập nhật số dư tài khoản
-        const updateResult = updateBankAccountBalance(accountNumber, balance, date);
-        
-        if (updateResult.success) {
-          // Gửi thông báo cập nhật thành công
-          sendTelegramMessage(updateResult.message);
+        // Kiểm tra intent từ kết quả AI
+        if (aiResult.intent === 'UpdateBankBalance') {
+          // Xử lý cập nhật số dư tài khoản
+          const { accountNumber, balance, date, group } = aiResult;
           
+          if (!accountNumber || !balance) {
+            Logger.log(`Thiếu thông tin số dư tài khoản: ${subject}`);
+            message.star();
+            message.markRead();
+            continue;
+          }
+
+          // Cập nhật số dư tài khoản
+          const updateResult = updateBankAccountBalance(accountNumber, balance, date);
+          
+          if (updateResult.success) {
+            // Gửi thông báo cập nhật thành công
+            sendTelegramMessage(updateResult.message);
+            
+          } else {
+            // Gửi thông báo lỗi
+            sendTelegramMessage(updateResult.error);
+          }
+          
+        } else if (aiResult.intent === 'AddTx') {
+          // Xử lý giao dịch thông thường (giữ nguyên logic cũ)
+          if (!isValidTransaction(aiResult, subject, body, message)) {
+            Logger.log(`Bỏ qua email không phải giao dịch: ${subject}`);
+            // Đánh dấu đã xử lý nhưng không thêm vào sheet
+            message.star();
+            message.markRead();
+            continue;
+          }
+
+
+          const groupTx = aiResult.group || '🛒Chi phí biến đổi';
+          const typeTx = aiResult.type || '🛒Chợ';
+          const dateTx = aiResult.date || '';
+          const descTx = aiResult.desc || '';
+          const amountTx = aiResult.amount || '0';
+          const locationTx = aiResult.location || 'N/A';
+          const categoryTx = aiResult.category || 'Khác';
+          const bankcommentTx = aiResult.bankcomment || '';
+          
+          //kiếm tra xem giao dịch có tồn tại chưa
+          const tx = {
+            date: dateTx,
+            amount: amountTx,
+            description: descTx,
+            bankComment: bankcommentTx,
+            category: categoryTx,
+            group: groupTx, 
+            type: typeTx,
+            location: locationTx
+          };
+
+          const checkResult = checkAndConfirmTransaction(tx);
+          sendTelegramMessage (checkResult.message, checkResult.replyMarkup);
+
         } else {
-          // Gửi thông báo lỗi
-          sendTelegramMessage(updateResult.error);
-        }
-        
-      } else if (aiResult.intent === 'AddTx') {
-        // Xử lý giao dịch thông thường (giữ nguyên logic cũ)
-        if (!isValidTransaction(aiResult, subject, body, message)) {
-          Logger.log(`Bỏ qua email không phải giao dịch: ${subject}`);
-          // Đánh dấu đã xử lý nhưng không thêm vào sheet
-          message.star();
-          message.markRead();
-          continue;
+          // Intent không xác định hoặc lỗi
+          Logger.log(`Không xác định được loại thông báo: ${subject}`);
+          sendLog (`❓ Không thể xác định loại thông báo từ email: ${subject}`);
         }
 
-
-        const groupTx = aiResult.group || '🛒Chi phí biến đổi';
-        const typeTx = aiResult.type || '🛒Chợ';
-        const dateTx = aiResult.date || '';
-        const descTx = aiResult.desc || '';
-        const amountTx = aiResult.amount || '0';
-        const locationTx = aiResult.location || 'N/A';
-        const categoryTx = aiResult.category || 'Khác';
-        const bankcommentTx = aiResult.bankcomment || '';
-        
-        //kiếm tra xem giao dịch có tồn tại chưa
-        const tx = {
-          date: dateTx,
-          amount: amountTx,
-          description: descTx,
-          bankComment: bankcommentTx,
-          category: categoryTx,
-          group: groupTx, 
-          type: typeTx,
-          location: locationTx
-        };
-
-        const checkResult = checkAndConfirmTransaction(tx);
-        sendTelegramMessage (checkResult.message, checkResult.replyMarkup);
-
-      } else {
-        // Intent không xác định hoặc lỗi
-        Logger.log(`Không xác định được loại thông báo: ${subject}`);
-        sendLog (`❓ Không thể xác định loại thông báo từ email: ${subject}`);
+        // Đánh dấu đã xử lý
+        message.star();
+        message.markRead();
       }
-
-      // Đánh dấu đã xử lý
-      message.star();
-      message.markRead();
     }
   }
 }

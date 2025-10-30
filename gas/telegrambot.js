@@ -79,13 +79,13 @@ function checkTelegramMessages() {
       }
     }
 
-    // Step 0: Check for project mode (POC Project Mode)
-    const projectResult = processProjectMode(replyText, originalText, replyText);
+    // Step 0: Check for project mode
+    const projectResult = processProjectMode(originalText, replyText);
     
     // Step 1: Detect user intent using OpenAI
     let interpretation;
     if (projectResult.isProjectMode && projectResult.isProjectValid && projectResult.isProjectActive) {
-      // Use project-specific intent detection
+      // Use project-specific intent detection (returns unified intents with project_tag)
       interpretation = detectProjectIntent(originalText, replyText, projectResult);
     } else if (projectResult.isProjectMode && (!projectResult.isProjectValid || !projectResult.isProjectActive)) {
       // Project mode detected but invalid/inactive
@@ -125,14 +125,8 @@ function checkTelegramMessages() {
 
       try {
         // Step 3: Call action handler for each intent
-        let actionResult;
-        if (projectResult.isProjectMode && projectResult.isProjectValid && projectResult.isProjectActive) {
-          // Pass project context for project intents
-          actionResult = handleIntent(intentObj, originalText, replyText, projectResult);
-        } else {
-          // Normal mode - no project context
-          actionResult = handleIntent(intentObj, originalText, replyText);
-        }
+        // Note: project_tag is now in intentObj, no need for separate projectContext
+        const actionResult = handleIntent(intentObj, originalText, replyText);
 
         // Collect messages and logs
         if (actionResult.messages && actionResult.messages.length > 0) {
