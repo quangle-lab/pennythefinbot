@@ -46,12 +46,70 @@ function getCurrentLocale() {
  * @returns {Object} Currency format configuration
  */
 function getCurrencyFormat(currency = null) {
-  const currentCurrency = currency || LOCALE_CONFIG.default_currency;
+  const currentCurrency = currency || LOCALE_CONFIG.currency;
   return LOCALE_CONFIG.currencyFormat[currentCurrency] || LOCALE_CONFIG.currencyFormat.EUR;
 }
 
 function convertAmountToDefaultCurrency(amount, currency = null) {
-  //to be completed
+  const fromCurrency = (currency || '').toUpperCase();
+  const toCurrency = (LOCALE_CONFIG.currency || 'EUR').toUpperCase();
+  return convertCurrency(amount, fromCurrency, toCurrency);
+}
+
+/**
+ * Convert an amount between two currencies using live rates with caching
+ * @param {number} amount - Numeric amount to convert
+ * @param {string} fromCurrency - Source currency code (e.g. USD)
+ * @param {string} toCurrency - Target currency code (e.g. VND)
+ * @returns {number} Converted amount (rounded according to target currency format)
+ */
+function convertCurrency(amount, fromCurrency, toCurrency) {
+  try {
+    if (!amount || !fromCurrency || !toCurrency || fromCurrency === toCurrency) {
+      return Math.round(amount * 100) / 100;
+    }
+
+    const from = fromCurrency.toUpperCase();
+    const to = toCurrency.toUpperCase();
+    
+    // Check cache first
+    const cache = CacheService.getScriptCache();
+    const cacheKey = `fx_${from}_${to}_${amount}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return parseFloat(cached);
+    }
+
+    // Build API URL with amount, from, to, and access_key
+    const keyParam = (typeof EXRATE_API !== 'undefined' && EXRATE_API) ? `&access_key=${encodeURIComponent(EXRATE_API)}` : '';
+    const url = `https://api.exchangerate.host/convert?amount=${encodeURIComponent(amount)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${keyParam}`;
+    
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, method: 'get' });
+    const status = response.getResponseCode();
+    
+    if (status >= 200 && status < 300) {
+      const data = JSON.parse(response.getContentText());
+      if (data && data.success && data.result) {
+        const converted = parseFloat(data.result);
+        if (!isNaN(converted) && converted > 0) {
+          // Round according to target currency format
+          const decimals = (getCurrencyFormat(to).decimals || 2);
+          const factor = Math.pow(10, decimals);
+          const rounded = Math.round(converted * factor) / factor;
+          
+          // Cache for 1 hour
+          cache.put(cacheKey, rounded.toString(), 60 * 60);
+          return rounded;
+        }
+      }
+    }
+
+    Logger.log(`Failed to convert ${amount} ${from} to ${to}. Status: ${status}`);
+    return amount;
+  } catch (error) {
+    Logger.log(`convertCurrency error: ${error.toString()}`);
+    return amount;
+  }
 }
 
 /**

@@ -65,12 +65,27 @@ function handleAddTransaction(intentObj) {
   try {
     const dateTx = intentObj.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
+    // Currency handling
+    const defaultCurrency = (LOCALE_CONFIG.currency || 'EUR').toUpperCase();
+    const inputCurrency = (intentObj.currency || defaultCurrency).toUpperCase();
+    const originalAmount = parseFloat(intentObj.amount) || 0;
+    let amountForSheet = originalAmount;
+    let descriptionWithOriginal = intentObj.desc;
+    let conversionNotice = null;
+
+    if (inputCurrency !== defaultCurrency && originalAmount) {
+      amountForSheet = convertCurrency(originalAmount, inputCurrency, defaultCurrency);
+      const originalText = `${formatNumber(originalAmount, inputCurrency)} ${inputCurrency}`;
+      descriptionWithOriginal = `${intentObj.desc} (${originalText})`;
+      conversionNotice = `💱 Đã quy đổi ${originalText} → ${formatCurrency(amountForSheet, defaultCurrency)}`;
+    }
+
     // Prepare transaction data
     const transactionData = {
       type: intentObj.type,
       date: dateTx,
-      description: intentObj.desc,
-      amount: intentObj.amount,
+      description: descriptionWithOriginal,
+      amount: amountForSheet,
       location: intentObj.location,
       category: intentObj.category,
       bankComment: intentObj.comment
@@ -101,7 +116,7 @@ function handleAddTransaction(intentObj) {
       
       return {
         success: true,
-        messages: [result.message],
+        messages: conversionNotice ? [conversionNotice, result.message] : [result.message],
         logs: [result.message],
         replyMarkup: result.replyMarkup
       };
@@ -129,7 +144,7 @@ function handleAddTransaction(intentObj) {
     } else {    
       return {
         success: true,
-        messages: [result.message],
+        messages: conversionNotice ? [conversionNotice, result.message] : [result.message],
         logs: [result.message],
         replyMarkup: result.replyMarkup
       };

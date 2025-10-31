@@ -64,12 +64,27 @@ function processBankAlerts() {
           const locationTx = aiResult.location || 'N/A';
           const categoryTx = aiResult.category || 'Khác';
           const bankcommentTx = aiResult.bankcomment || '';
+          const defaultCurrency = (LOCALE_CONFIG.currency || 'EUR').toUpperCase();
+          const inputCurrency = (aiResult.currency || defaultCurrency).toUpperCase();
+
+          // Normalize amount number
+          const numericAmount = typeof amountTx === 'number' ? amountTx : parseFloat(parseCurrency(amountTx.toString(), inputCurrency));
+          let amountForSheet = numericAmount;
+          let descWithOriginal = descTx;
+          let conversionNotice = null;
+
+          if (inputCurrency !== defaultCurrency && numericAmount) {
+            amountForSheet = convertCurrency(numericAmount, inputCurrency, defaultCurrency);
+            const originalText = `${formatNumber(numericAmount, inputCurrency)} ${inputCurrency}`;
+            descWithOriginal = `${descTx} (${originalText})`;
+            conversionNotice = `💱 Đã quy đổi ${originalText} → ${formatCurrency(amountForSheet, defaultCurrency)}`;
+          }
           
           //kiếm tra xem giao dịch có tồn tại chưa
           const tx = {
             date: dateTx,
-            amount: amountTx,
-            description: descTx,
+            amount: amountForSheet,
+            description: descWithOriginal,
             bankComment: bankcommentTx,
             category: categoryTx,
             group: groupTx, 
@@ -78,7 +93,8 @@ function processBankAlerts() {
           };
 
           const checkResult = checkAndConfirmTransaction(tx);
-          sendTelegramMessage (checkResult.message, checkResult.replyMarkup);
+          const messageToSend = conversionNotice ? `${conversionNotice}\n\n${checkResult.message}` : checkResult.message;
+          sendTelegramMessage (messageToSend, checkResult.replyMarkup);
 
         } else {
           // Intent không xác định hoặc lỗi
