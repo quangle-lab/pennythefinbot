@@ -263,11 +263,6 @@ function initMonthlyBudget () {
   sendTelegramMessage (budgetAnlyticsResp);
 }
 
-/**
- * Download photo from Telegram API
- * @param {string} fileId - Telegram file ID
- * @returns {Blob} Downloaded photo blob
- */
 function getTelegramPhoto(fileId) {
   try {
     const telegramToken = TELEGRAM_TOKEN;

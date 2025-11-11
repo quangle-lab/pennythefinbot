@@ -68,7 +68,7 @@ function handleAddTransaction(intentObj) {
     // Currency handling
     const defaultCurrency = (LOCALE_CONFIG.currency || 'EUR').toUpperCase();
     const inputCurrency = (intentObj.currency || defaultCurrency).toUpperCase();
-    const originalAmount = parseFloat(intentObj.amount) || 0;
+    const originalAmount = intentObj.amount || 0;
     let amountForSheet = originalAmount;
     let descriptionWithOriginal = intentObj.desc;
     let conversionNotice = null;
@@ -675,13 +675,6 @@ function handleOthers(intentObj) {
   }
 }
 
-
-/**
- * Process receipt photo and extract transaction data
- * @param {string} fileId - Telegram file ID
- * @param {string} userMessage - Optional user message with the photo
- * @returns {Object} Result object with success status and data/error
- */
 function handleReceiptPhoto(fileId, userMessage = "") {
   try {
     // Download the photo

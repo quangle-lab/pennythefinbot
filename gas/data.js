@@ -270,20 +270,19 @@ function checkAndConfirmTransaction(transaction) {
     };
   }
 
-  // Validate input date
-  let inputDate;
+  // Validate input date  
   try {
     // Handle different date formats
     if (typeof date === 'string') {
       const dateParts = date.split('/');
       if (dateParts.length === 3) {
         // DD/MM/YYYY format
-        inputDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+        new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
       } else {
-        inputDate = new Date(date);
+        new Date(date);
       }
     } else {
-      inputDate = new Date(date);
+      new Date(date);
     }
   } catch (e) {
     return {
@@ -331,14 +330,11 @@ function checkAndConfirmTransaction(transaction) {
          bankComment.toLowerCase().includes(rowBankComment.toLowerCase()));
 
       // Consider it a potential duplicate if:
-      // 1. Same date AND same amount, OR
-      // 2. Same date AND similar description, OR
-      // 3. Same amount AND same bank comment (if available)
-      if ((dateMatch && amountMatch) ||
-          (amountMatch && bankCommentMatch)) {
+      // Same date AND same amount AND same bank comment
+      if (dateMatch && amountMatch && bankCommentMatch) {
         existingRows.push({
           rowNumber: i + 1,
-          date: rowDateFormatted,          
+          date: rowDateFormatted,
           amount: rowAmount,
           location: rowLocation,
           category: rowCategory,
@@ -1243,9 +1239,7 @@ function checkMissingTxID(sheetName = null) {
 function searchTx(searchParams) {
   const { startDate, endDate, groups, categories, keywords } = searchParams;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const timezone = Session.getScriptTimeZone();
 
-  // Get all available transaction groups (sheet names)
   const availableGroups = [
     "💰Thu nhập",
     "🏡Chi phí cố định",
@@ -1255,39 +1249,16 @@ function searchTx(searchParams) {
     "🫙Tiết kiệm"
   ];
 
-  // Determine which groups to search
-  let groupsToSearch = groups && groups.length > 0 ? groups : availableGroups;
-
-  // Parse date filters
-  let startDateObj = null;
-  let endDateObj = null;
-
-  if (startDate) {
-    try {
-      const dateParts = startDate.split('/');
-      if (dateParts.length === 3) {
-        startDateObj = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
-      }
-    } catch (e) {
-      Logger.log(`Invalid start date format: ${startDate}`);
-    }
-  }
-
-  if (endDate) {
-    try {
-      const dateParts = endDate.split('/');
-      if (dateParts.length === 3) {
-        endDateObj = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
-      }
-    } catch (e) {
-      Logger.log(`Invalid end date format: ${endDate}`);
-    }
-  }
+  const groupsToSearch = Array.isArray(groups) && groups.length > 0 ? groups : availableGroups;
+  const startDateObj = parseDateInput(startDate);
+  const endDateObj = parseDateInput(endDate);
+  const normalizedCategories = normalizeArrayInput(categories);
+  const normalizedKeywords = normalizeArrayInput(keywords);
+  const keywordRegex = buildKeywordRegex(normalizedKeywords);
 
   const searchResults = [];
   let totalMatches = 0;
 
-  // Search through each group
   groupsToSearch.forEach(groupName => {
     const sheet = ss.getSheetByName(groupName);
     if (!sheet) {
@@ -1295,54 +1266,85 @@ function searchTx(searchParams) {
       return;
     }
 
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return; // Skip if no data (only header)
+    const dataRange = sheet.getDataRange();
+    if (dataRange.getNumRows() <= 1) {
+      return;
+    }
 
-    const groupMatches = [];
+    const values = dataRange.getValues();
+    const existingFilter = sheet.getFilter();
+    if (existingFilter) {
+      existingFilter.remove();
+    }
 
-    // Search through each transaction (skip header row)
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const rowDate = row[0];
-      const rowDesc = row[1] || '';
-      const rowAmount = row[2];
-      const rowLocation = row[3] || '';
-      const rowCategory = row[4] || '';
-      const rowBankComment = row[5] || '';
-      const rowId = row[6] || '';
+    const filter = dataRange.createFilter();
+    const appliedColumns = [];
 
-      // Skip empty rows
-      if (!rowDate || !rowDesc) continue;
-
-      let matches = true;
-
-      // Date range filter
+    try {
       if (startDateObj || endDateObj) {
-        try {
-          const transactionDate = new Date(rowDate);
-          if (startDateObj && transactionDate < startDateObj) matches = false;
-          if (endDateObj && transactionDate > endDateObj) matches = false;
-        } catch (e) {
-          matches = false; // Skip rows with invalid dates
+        const dateCriteriaBuilder = SpreadsheetApp.newFilterCriteria();
+
+        if (startDateObj && endDateObj) {
+          var startDateNum = startDateObj.getTime()/1000/86400 + 25569;
+          var endDateNum = endDateObj.getTime()/1000/86400 + 25569;
+          dateCriteriaBuilder.whenNumberBetween(startDateNum, endDateNum); 
+        } else if (startDateObj) {
+          dateCriteriaBuilder.whenDateAfter(startDateObj);
+        } else if (endDateObj) {
+          dateCriteriaBuilder.whenDateBefore(endDateObj);
         }
+
+        filter.setColumnFilterCriteria(1, dateCriteriaBuilder.build());
+        appliedColumns.push(1);
       }
 
-      // Category filter
-      if (matches && categories && categories.length > 0) {
-        matches = categories.some(cat =>
-          rowCategory.toLowerCase().includes(cat.toLowerCase())
-        );
+      if (normalizedCategories.length > 0) {
+        const visibleCategories = resolveVisibleCategories(values, normalizedCategories);
+        if (visibleCategories.length === 0) {
+          return;
+        }
+
+        const categoryCriteria = SpreadsheetApp.newFilterCriteria()
+          .whenTextEqualToAny(visibleCategories)
+          .build();
+
+        filter.setColumnFilterCriteria(5, categoryCriteria);
+        appliedColumns.push(5);
       }
 
-      // Keywords filter (search in description and bank comment)
-      if (matches && keywords && keywords.length > 0) {
-          matches = keywords.some(keyword =>
-            rowDesc.toLowerCase().includes(keyword.toLowerCase()) ||
-            rowBankComment.toLowerCase().includes(keyword.toLowerCase())
-        );
+      if (keywordRegex) {
+        const firstDataRow = dataRange.getRow() + 1;
+        const keywordFormula = `=REGEXMATCH(LOWER($B${firstDataRow}&" "&$F${firstDataRow}), "${keywordRegex}")`;
+        const keywordCriteria = SpreadsheetApp.newFilterCriteria()
+          .whenFormulaSatisfied(keywordFormula)
+          .build();
+
+        //filter the description column
+        filter.setColumnFilterCriteria(2, keywordCriteria);
+        appliedColumns.push(2);
+
+        //filter the bank comment column
+        filter.setColumnFilterCriteria(5, keywordCriteria);
+        appliedColumns.push(5);
       }
 
-      if (matches) {
+      const groupMatches = [];
+
+      for (let i = 1; i < values.length; i++) {
+        const sheetRow = dataRange.getRow() + i;
+        if (appliedColumns.length > 0 && sheet.isRowHiddenByFilter(sheetRow)) {
+          continue;
+        }
+
+        const row = values[i];
+        const rowDate = row[0];
+        const rowDesc = row[1] || '';
+        const rowAmount = row[2];
+        const rowLocation = row[3] || '';
+        const rowCategory = row[4] || '';
+        const rowBankComment = row[5] || '';
+        const rowId = row[6] || '';
+
         groupMatches.push({
           date: rowDate,
           description: rowDesc,
@@ -1351,17 +1353,19 @@ function searchTx(searchParams) {
           category: rowCategory,
           bankComment: rowBankComment,
           id: rowId,
-          rowNumber: i + 1
+          rowNumber: sheetRow
         });
         totalMatches++;
       }
-    }
 
-    if (groupMatches.length > 0) {
-      searchResults.push({
-        groupName: groupName,
-        transactions: groupMatches
-      });
+      if (groupMatches.length > 0) {
+        searchResults.push({
+          groupName: groupName,
+          transactions: groupMatches
+        });
+      }
+    } finally {
+      filter.remove();
     }
   });
 
@@ -1373,6 +1377,78 @@ function searchTx(searchParams) {
   };
 }
 
+  function parseDateInput(dateValue) {
+    if (!dateValue) return null;
+
+    if (Object.prototype.toString.call(dateValue) === '[object Date]' && !isNaN(dateValue)) {
+      return new Date(dateValue);
+    }
+
+    if (typeof dateValue === 'string') {
+      const dateParts = dateValue.split('/');
+      if (dateParts.length === 3) {
+        const [day, month, year] = dateParts;
+        const parsed = new Date(`${year}-${month}-${day}`);
+        if (!isNaN(parsed)) {
+          return parsed;
+        }
+      }
+
+      const parsed = new Date(dateValue);
+      if (!isNaN(parsed)) {
+        return parsed;
+      }
+    }
+
+    Logger.log(`Invalid date input for searchTx: ${dateValue}`);
+    return null;
+  }
+
+  function normalizeArrayInput(values) {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return values
+      .map(value => (value || '').toString().trim())
+      .filter(Boolean);
+  }
+
+  function resolveVisibleCategories(values, categoryFilters) {
+    const matchedCategories = new Set();
+    const lowerFilters = categoryFilters.map(cat => cat.toLowerCase());
+
+    for (let i = 1; i < values.length; i++) {
+      const rowCategory = values[i][4];
+      if (!rowCategory) continue;
+
+      const lowerCategory = rowCategory.toString().toLowerCase();
+      if (lowerFilters.some(filterValue => lowerCategory.indexOf(filterValue) !== -1)) {
+        matchedCategories.add(rowCategory);
+      }
+    }
+
+    return Array.from(matchedCategories);
+  }
+
+  function buildKeywordRegex(keywordList) {
+    if (!keywordList || keywordList.length === 0) {
+      return '';
+    }
+
+    const sanitized = keywordList
+      .map(keyword => keyword.toLowerCase())
+      .filter(Boolean)
+      .map(keyword => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .map(keyword => keyword.replace(/"/g, '""'));
+
+    if (sanitized.length === 0) {
+      return '';
+    }
+
+    return sanitized.join('|');
+  }
+
 //định dạng kết quả tìm kiếm theo cấu trúc phân cấp
 function formatSearchResults(searchData) {
   if (!searchData.success || searchData.totalMatches === 0) {
@@ -1382,8 +1458,8 @@ function formatSearchResults(searchData) {
   const { results, totalMatches, searchParams } = searchData;
   const timezone = Session.getScriptTimeZone();
 
-  let message = `🔍 *Kết quả tìm kiếm* \(${totalMatches} giao dịch\)\n`;
-  message += "\=" .repeat(15) + "\n\n";
+  let message = `🔍 *Kết quả tìm kiếm* \(${totalMatches} giao dịch\)\n\n`;
+  message += "\\=" .repeat(15) + "\n";
 
   // Add search criteria summary
   if (searchParams.startDate || searchParams.endDate) {
@@ -1409,12 +1485,12 @@ function formatSearchResults(searchData) {
     message += `🔎 *Từ khóa*\: "${searchParams.keywords.join(', ')}"\n`;
   }
 
-  message += "\n" + "\=" .repeat(15) + "\n\n";
+  message += "\\=" .repeat(15) + "\n\n";
 
   // Format results by group > category > date
   results.forEach(groupResult => {
     message += `*${groupResult.groupName}*\n`;
-    message += "\-" .repeat(15) + "\n";
+    message += "\\-" .repeat(15) + "\n";
 
     // Group transactions by category
     const categorizedTx = {};
@@ -1443,7 +1519,7 @@ function formatSearchResults(searchData) {
         try {
           const formattedDate = Utilities.formatDate(new Date(tx.date), timezone, "dd/MM");
           const amount = typeof tx.amount === 'number' ? tx.amount : parseFloat(tx.amount);
-          message += `  • *${formattedDate}*\: ${tx.description} \- *${formatCurrency(amount)}*\n`;
+          message += `  • *${formattedDate}*\: ${tx.description} \- *${formatCurrency(amount)}* (${tx.id})\n`;
         } catch (e) {
           // Fallback for invalid dates
           const amount = typeof tx.amount === 'number' ? tx.amount : parseFloat(tx.amount);
@@ -1605,10 +1681,7 @@ function getBudgetInstructions() {
 
 //---------------PROJECT MODE SUPPORT-------------------//
 
-/**
- * Initialize project metadata sheet if it doesn't exist
- * @returns {Object} Result of initialization
- */
+
 function initializeProjectMetadataSheet() {
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);

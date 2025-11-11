@@ -68,14 +68,14 @@ function processBankAlerts() {
           const inputCurrency = (aiResult.currency || defaultCurrency).toUpperCase();
 
           // Normalize amount number
-          const numericAmount = typeof amountTx === 'number' ? amountTx : parseFloat(parseCurrency(amountTx.toString(), inputCurrency));
-          let amountForSheet = numericAmount;
+          //const numericAmount = typeof amountTx === 'number' ? amountTx : parseFloat(parseCurrency(amountTx.toString(), inputCurrency));
+          let amountForSheet = amountTx;
           let descWithOriginal = descTx;
           let conversionNotice = null;
 
-          if (inputCurrency !== defaultCurrency && numericAmount) {
-            amountForSheet = convertCurrency(numericAmount, inputCurrency, defaultCurrency);
-            const originalText = `${formatNumber(numericAmount, inputCurrency)} ${inputCurrency}`;
+          if (inputCurrency !== defaultCurrency && amountTx) {
+            amountForSheet = convertCurrency(amountTx, inputCurrency, defaultCurrency);
+            const originalText = `${formatNumber(amountTx, inputCurrency)} ${inputCurrency}`;
             descWithOriginal = `${descTx} (${originalText})`;
             conversionNotice = `💱 Đã quy đổi ${originalText} → ${formatCurrency(amountForSheet, defaultCurrency)}`;
           }
@@ -178,10 +178,6 @@ function isValidTransaction(aiResult, subject, body, message = null) {
         return false;
       }
 
-      // Nếu số tiền quá lớn (> 50,000) có thể là spam
-      if (amountNum > 50000) {
-        return false;
-      }
     }
 
     // 5. Kiểm tra ngày có hợp lệ không
