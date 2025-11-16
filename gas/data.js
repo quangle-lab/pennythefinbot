@@ -528,115 +528,134 @@ function getCategoryRemainingAmount(group, category) {
   }
 }
 
-//lấy số dư hiện tại của Quỹ -- gia đình (family), mục tiêu (target) hoặc tiết kiệm (saving)
+//lấy số dư hiện tại của Quỹ -- gia đình (rainy/family), mục tiêu (target) hoặc tiết kiệm (saving)
+//Dữ liệu được lấy từ range tổng hợp stats_BalanceOverview (hoặc tên khác cấu hình trong bankAccountBalanceRange)
+//Cấu trúc cột: 
+// 1: Nhóm (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục đích, Tiết kiệm)
+// 2: Tiền mặt hiện có cho nhóm
+// 3: Số tiền cần theo dự toán / số dư quỹ tính toán
+// 4: Chênh lệch giữa (2) và (3)
+// 5: Số tài khoản ngân hàng (nếu có)
+// 6: Ngày cập nhật
+// 7: Mục tiêu nếu có
+// 8: Ghi chú
 function getFundBalances(type) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const props = PropertiesService.getScriptProperties();
+    const rangeName = props.getProperty('bankAccountBalanceRange') || 'stats_BalanceOverview';
+    const namedRange = ss.getRangeByName(rangeName);
 
-  // Map type to named range
-  const typeToRangeMap = {
-    "family": "sodu_QuyGiaDinh",
-    "target": "sodu_QuyMucDich",
-    "saving": "sodu_Tietkiem",
-    "all": ["sodu_QuyGiaDinh", "sodu_QuyMucDich", "sodu_Tietkiem"]
-  };
-
-  // If specific type is requested
-  if (type && type !== "all") {
-    const rangeName = typeToRangeMap[type];
-    if (!rangeName) {
+    if (!namedRange) {
       return {
         success: false,
-        error: `❌ Loại quỹ không hợp lệ: "${type}". Các loại có sẵn: rainy, target, saving, all`
+        error: `❌ Không tìm thấy named range: "${rangeName}"`
       };
     }
 
-    try {
-      const namedRange = ss.getRangeByName(rangeName);
-      if (!namedRange) {
-        return {
-          success: false,
-          error: `❌ Không tìm thấy named range: "${rangeName}"`
-        };
+    const values = namedRange.getValues();
+    const timezone = Session.getScriptTimeZone();
+
+    // Hỗ trợ cả "rainy" và "family" là Quỹ gia đình
+    const normalizedType = (type || 'all').toLowerCase();
+
+    const typeToGroupName = {
+      rainy: 'Quỹ gia đình',
+      family: 'Quỹ gia đình',
+      target: 'Quỹ mục đích',
+      saving: 'Tiết kiệm'
+    };
+
+    const resultBalances = {};
+    let totalCash = 0;
+    let totalPlanned = 0;
+    let totalGap = 0;
+
+    // Bỏ qua header nếu có
+    const startRow = values[0][0] && values[0][0].toString().toLowerCase().includes('group') ? 1 : 0;
+
+    for (let i = startRow; i < values.length; i++) {
+      const row = values[i];
+      const groupName = (row[0] || '').toString().trim();
+      if (!groupName) continue;
+
+      // Xác định type tương ứng cho dòng này (chỉ lấy các quỹ)
+      let fundType = null;
+      if (groupName.indexOf('Quỹ gia đình') !== -1) {
+        fundType = 'rainy';
+      } else if (groupName.indexOf('Quỹ mục đích') !== -1) {
+        fundType = 'target';
+      } else if (groupName.indexOf('Tiết kiệm') !== -1) {
+        fundType = 'saving';
       }
 
-      const values = namedRange.getValues();
-      const balances = {};
-      let totalBalance = 0;
-
-      values.forEach(([name, amount]) => {
-        if (name && amount != null) {
-          const numericAmount = parseFloat(amount) || 0;
-          balances[name] = Math.round(numericAmount*100)/100;
-          totalBalance += Math.round(numericAmount*100)/100;
-        }
-      });
-
-      return {
-        success: true,
-        type: type,
-        balances: balances,
-        total: totalBalance,
-        rangeName: rangeName
-      };
-
-    } catch (error) {
-      return {
-        success: false,
-        error: `❌ Lỗi khi lấy dữ liệu từ "${rangeName}": ${error.toString()}`
-      };
-    }
-  }
-
-  // If "all" or no type specified, get all fund balances
-  try {
-    const allBalances = {};
-    let grandTotal = 0;
-    const rangeNames = typeToRangeMap.all;
-
-    for (const rangeName of rangeNames) {
-      const namedRange = ss.getRangeByName(rangeName);
-      if (!namedRange) {
-        console.warn(`Named range not found: ${rangeName}`);
+      if (!fundType) {
+        // Không phải dòng quỹ → bỏ qua
         continue;
       }
 
-      const values = namedRange.getValues();
-      const fundBalances = {};
-      let fundTotal = 0;
+      // Nếu gọi với type cụ thể thì chỉ lấy đúng loại
+      if (normalizedType !== 'all' && fundType !== normalizedType) {
+        continue;
+      }
 
-      values.forEach(([name, amount]) => {
-        if (name && amount != null) {
-          const numericAmount = parseFloat(amount) || 0;
-          fundBalances[name] = Math.round(numericAmount*100)/100;
-          fundTotal += Math.round(numericAmount*100)/100;
+      const cash = parseFloat(row[1]) || 0;
+      const planned = parseFloat(row[2]) || 0;
+      const gap = parseFloat(row[3]) || 0;
+      const accountNumber = row[4] || '';
+      const updateDateRaw = row[5] || '';
+      const targetAmount = parseFloat(row[6]) || 0;
+      const note = row[7] || '';
+
+      let updateDate = '';
+      if (updateDateRaw) {
+        try {
+          updateDate = Utilities.formatDate(updateDateRaw, timezone, 'dd/MM/yyyy');
+        } catch (e) {
+          updateDate = updateDateRaw.toString();
         }
-      });
+      }
 
-      // Map range name back to fund type
-      const fundType = Object.keys(typeToRangeMap).find(key =>
-        typeToRangeMap[key] === rangeName
-      );
-
-      allBalances[fundType] = {
-        items: fundBalances,
-        total: Math.round(fundTotal*100)/100,
-        rangeName: rangeName
+      resultBalances[fundType] = {
+        groupName: groupName,
+        cashAvailable: Math.round(cash * 100) / 100,
+        plannedAmount: Math.round(planned * 100) / 100,
+        gap: Math.round(gap * 100) / 100,
+        accountNumber: accountNumber,
+        updateDate: updateDate,
+        targetAmount: Math.round(targetAmount * 100) / 100,
+        note: note
       };
 
-      grandTotal += Math.round(fundTotal*100)/100;
+      totalCash += Math.round(cash * 100) / 100;
+      totalPlanned += Math.round(planned * 100) / 100;
+      totalGap += Math.round(gap * 100) / 100;
+    }
+
+    if (normalizedType !== 'all' && !resultBalances[normalizedType]) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy dữ liệu cho loại quỹ "${type}". Các loại hợp lệ: rainy, target, saving, all`
+      };
     }
 
     return {
       success: true,
-      type: "all",
-      balances: allBalances,
-      grandTotal: grandTotal
+      type: normalizedType,
+      balances: resultBalances,
+      totals: {
+        cash: totalCash,
+        planned: totalPlanned,
+        gap: totalGap
+      },
+      grandTotal: totalCash, // giữ field cũ cho tương thích ngược
+      rangeName: rangeName
     };
 
   } catch (error) {
     return {
       success: false,
-      error: `❌ Lỗi khi lấy tất cả số dư quỹ: ${error.toString()}`
+      error: `❌ Lỗi khi lấy số dư quỹ: ${error.toString()}`
     };
   }
 }
@@ -649,7 +668,7 @@ function formatFundBalances(balanceData) {
 
   if (balanceData.type === "all") {
     let message = "💰*Tổng quan số dư các quỹ*\n";
-    message += "\-" .repeat(15) + "\n";
+    message += "\\-" .repeat(15) + "\n";
 
     const fundNames = {
       "rainy": "🛟Quỹ Gia Đình",
@@ -657,58 +676,108 @@ function formatFundBalances(balanceData) {
       "saving": "💎Tiết Kiệm"
     };
 
-    Object.keys(balanceData.balances).forEach(fundType => {
+    ["rainy", "target", "saving"].forEach(fundType => {
       const fund = balanceData.balances[fundType];
+      if (!fund) return;
+
       const fundName = fundNames[fundType] || fundType;
 
       message += `*${fundName}*\n`;
+      message += `  • Số dư: ${formatCurrency(fund.cashAvailable)}\n`;
+      message += `  • Mức tính toán: ${formatCurrency(fund.plannedAmount)}\n`;
+      message += `  • Chênh lệch\ ${formatCurrency(fund.gap)}\n`;
 
-      if (Object.keys(fund.items).length > 0) {
-        Object.entries(fund.items).forEach(([name, amount]) => {
-          message += `  • ${name}: ${formatCurrency(amount)}\n`;
-        });
-        message += `  *Tổng\: ${formatCurrency(fund.total)}*\n\n`;
-      } else {
-        message += `  _Không có dữ liệu_\n\n`;
+      if (fund.targetAmount && fund.targetAmount !== 0) {
+        message += `  • Mục tiêu: ${formatCurrency(fund.targetAmount)}\n`;
       }
+
+      if (fund.accountNumber) {
+        message += `  • TK: ${fund.accountNumber}`;
+        if (fund.updateDate) {
+          message += ` (_cập nhật: ${fund.updateDate}_)`;
+        }
+        message += `\n`;
+      }
+
+      if (fund.note) {
+        message += `  • Ghi chú: ${fund.note}\n`;
+      }
+
+      message += `\n`;
     });
 
-    message += `🏦 *Tổng cộng tất cả quỹ\: ${formatCurrency(balanceData.grandTotal)}*`;
+    const totalCash = balanceData.totals && typeof balanceData.totals.cash === 'number'
+      ? balanceData.totals.cash
+      : balanceData.grandTotal || 0;
+
+    message += `🏦 *Tổng cộng tiền quỹ hiện có: ${formatCurrency(totalCash)}*`;
     return message;
 
   } else {
-    // Single fund type
+    // Single fund type (rainy / target / saving)
     const fundNames = {
       "rainy": "🛟Quỹ Gia Đình",
       "target": "🎯Quỹ Mục Đích",
       "saving": "💎Tiết Kiệm"
     };
 
-    const fundName = fundNames[balanceData.type] || balanceData.type;
+    const fundType = balanceData.type;
+    const fundName = fundNames[fundType] || fundType;
     let message = `💰*${fundName}*\n`;
-    message += "\-" .repeat(15) + "\n";
+    message += "\\-" .repeat(15) + "\n";
 
-    if (Object.keys(balanceData.balances).length > 0) {
-      Object.entries(balanceData.balances).forEach(([name, amount]) => {
-        message += `• ${name}: ${formatCurrency(amount)}\n`;
-      });
-      message += `\n*Tổng\: ${formatCurrency(balanceData.total)}*`;
-    } else {
+    const fund = balanceData.balances && balanceData.balances[fundType];
+
+    if (!fund) {
       message += "_Không có dữ liệu_";
+      return message;
     }
+
+    message += `• Tiền hiện có: ${formatCurrency(fund.cashAvailable)}\n`;
+    message += `• Mức cần theo kế hoạch: ${formatCurrency(fund.plannedAmount)}\n`;
+    message += `• Chênh lệch: ${formatCurrency(fund.gap)}\n`;
+
+    if (fund.targetAmount && fund.targetAmount !== 0) {
+      message += `• Mục tiêu: ${formatCurrency(fund.targetAmount)}\n`;
+    }
+
+    if (fund.accountNumber) {
+      message += `• TK: ${fund.accountNumber}`;
+      if (fund.updateDate) {
+        message += ` (_cập nhật: ${fund.updateDate}_)`;
+      }
+      message += `\n`;
+    }
+
+    if (fund.note) {
+      message += `• Ghi chú: ${fund.note}\n`;
+    }
+
+    const totalCash = balanceData.totals && typeof balanceData.totals.cash === 'number'
+      ? balanceData.totals.cash
+      : fund.cashAvailable;
+
+    message += `\n*Tổng: ${formatCurrency(totalCash)}*`;
 
     return message;
   }
 }
 
-//lấy dữ liệu số dư tài khoản ngân hàng từ dashboard
-function getBankAccountBalances() {
+//lấy dữ liệu chi tiết tiết kiệm từ stats_SavingBreakdown
+//Cấu trúc cột:
+// 1: Type (cash, forex, coin, etf, etc.)
+// 2: Balance (số tiền hiện có)
+// 3: Account number
+// 4: Balance in forex (nếu có)
+// 5: Update date
+// 6: Note
+function getSavingBreakdown() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const props = PropertiesService.getScriptProperties();
     
     // Get the named range from sheet settings
-    const rangeName = props.getProperty('bankAccountBalanceRange') || 'sodu_TaiKhoanNganHang';
+    const rangeName = props.getProperty('range_Savings') || 'stats_SavingBreakdown';
     
     const namedRange = ss.getRangeByName(rangeName);
     if (!namedRange) {
@@ -721,7 +790,92 @@ function getBankAccountBalances() {
     const values = namedRange.getValues();
     const timezone = Session.getScriptTimeZone();
     
-    // Expected columns: Group Name, Bank Account Balance, Difference, Bank Account Number, Update Date
+    const savingItems = [];
+    let totalBalance = 0;
+
+    // Skip header row if exists
+    const startRow = values[0][0] && values[0][0].toString().toLowerCase().includes('type') ? 1 : 0;
+
+    for (let i = startRow; i < values.length; i++) {
+      const row = values[i];
+      
+      // Check if row has valid data
+      if (row[0] && row[1] !== null && row[1] !== undefined) {
+        const type = (row[0] || '').toString().trim();
+        const balance = parseFloat(row[1]) || 0;
+        const accountNumber = row[2] || '';
+        const balanceForex = parseFloat(row[3]) || 0;
+        const updateDateRaw = row[4] || '';
+        const note = row[5] || '';
+
+        let updateDate = '';
+        if (updateDateRaw) {
+          try {
+            updateDate = Utilities.formatDate(updateDateRaw, timezone, "dd/MM/yyyy");
+          } catch (e) {
+            updateDate = updateDateRaw.toString();
+          }
+        }
+
+        savingItems.push({
+          type: type,
+          balance: Math.round(balance * 100) / 100,
+          accountNumber: accountNumber,
+          balanceForex: balanceForex > 0 ? Math.round(balanceForex * 100) / 100 : null,
+          updateDate: updateDate,
+          note: note
+        });
+
+        totalBalance += Math.round(balance * 100) / 100;
+      }
+    }
+
+    return {
+      success: true,
+      savingItems: savingItems,
+      totalBalance: totalBalance,
+      rangeName: rangeName,
+      lastUpdated: new Date().toISOString()
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `❌ Lỗi khi lấy dữ liệu chi tiết tiết kiệm: ${error.toString()}`
+    };
+  }
+}
+
+//lấy dữ liệu số dư tài khoản ngân hàng từ bảng tổng hợp stats_BalanceOverview
+//và tích hợp thêm dữ liệu chi tiết tiết kiệm từ stats_SavingBreakdown
+function getBankAccountBalances() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const props = PropertiesService.getScriptProperties();
+    
+    // Get the named range from sheet settings
+    const rangeName = props.getProperty('bankAccountBalanceRange') || 'stats_BalanceOverview';
+    
+    const namedRange = ss.getRangeByName(rangeName);
+    if (!namedRange) {
+      return {
+        success: false,
+        error: `❌ Không tìm thấy named range: "${rangeName}"`
+      };
+    }
+
+    const values = namedRange.getValues();
+    const timezone = Session.getScriptTimeZone();
+    
+    // Expected columns in overview range:
+    // 1: Group Name (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình, Quỹ mục đích, Tiết kiệm)
+    // 2: Cash available / Bank Account Balance
+    // 3: Remaining monthly budget or calculated fund balance
+    // 4: Gap between (2) and (3)
+    // 5: Bank Account Number
+    // 6: Update Date
+    // 7: Target amount (optional)
+    // 8: Note (optional)
     const bankBalances = [];
     let totalBankBalance = 0;
     let totalDifference = 0;
@@ -734,30 +888,53 @@ function getBankAccountBalances() {
       
       // Check if row has valid data
       if (row[0] && row[1] !== null && row[1] !== undefined) {
-        const groupName = row[0];
-        const bankBalance = parseFloat(row[1]) || 0;
-        const difference = parseFloat(row[2]) || 0;
-        const accountNumber = row[3] || '';
-        const updateDate = row[4] || '';      
+        const groupName = row[0].toString().trim();
 
+        // Chỉ lấy các nhóm chi tiêu có tài khoản ngân hàng thực tế (không lấy các quỹ)
+        if (
+          groupName.indexOf('Chi phí cố định') === -1 &&
+          groupName.indexOf('Chi phí biến đổi') === -1 &&
+          groupName.indexOf('Quỹ gia đình') === -1
+        ) {
+          continue;
+        }
+
+        const bankBalance = parseFloat(row[1]) || 0;
+        const difference = parseFloat(row[3]) || 0; // cột 4: chênh lệch giữa số dư và dự toán
+        const accountNumber = row[4] || '';
+        const updateDateRaw = row[5] || '';      
+
+        let updateDate = '';
+        if (updateDateRaw) {
+          try {
+            updateDate = Utilities.formatDate(updateDateRaw, timezone, "dd/MM/yyyy");
+          } catch (e) {
+            updateDate = updateDateRaw.toString();
+          }
+        }
+ 
         bankBalances.push({
           groupName: groupName,
           bankBalance: Math.round(bankBalance * 100) / 100,
           difference: Math.round(difference * 100) / 100,          
           accountNumber: accountNumber,
-          updateDate: Utilities.formatDate(updateDate, timezone, "dd/MM/yyyy")
+          updateDate: updateDate
         });
-
+ 
         totalBankBalance += Math.round(bankBalance * 100) / 100;
         totalDifference += Math.round(difference * 100) / 100;
       }
     }
 
+    // Get saving breakdown data
+    const savingBreakdown = getSavingBreakdown();
+ 
     return {
       success: true,
       bankBalances: bankBalances,
       totalBankBalance: totalBankBalance,
       totalDifference: totalDifference,
+      savingBreakdown: savingBreakdown.success ? savingBreakdown : null,
       rangeName: rangeName,
       lastUpdated: new Date().toISOString()
     };
@@ -770,6 +947,60 @@ function getBankAccountBalances() {
   }
 }
 
+//định dạng chi tiết tiết kiệm để hiển thị
+function formatSavingBreakdown(savingData) {
+  if (!savingData || !savingData.success) {
+    return savingData && savingData.error ? savingData.error : "";
+  }
+
+  if (!savingData.savingItems || savingData.savingItems.length === 0) {
+    return "";
+  }
+
+  let message = "\n💎*Chi tiết tiết kiệm*\n";
+  message += "\\-" .repeat(15) + "\n";
+
+  // Group by type for better display
+  const byType = {};
+  savingData.savingItems.forEach(item => {
+    if (!byType[item.type]) {
+      byType[item.type] = [];
+    }
+    byType[item.type].push(item);
+  });
+
+  Object.keys(byType).sort().forEach(type => {
+    const items = byType[type];
+    message += `*${type.toUpperCase()}*\n`;
+    
+    items.forEach(item => {
+      message += `  • ${formatCurrency(item.balance)}`;
+      
+      if (item.balanceForex) {
+        message += ` (${formatCurrency(item.balanceForex)} forex)`;
+      }
+      
+      if (item.accountNumber) {
+        message += ` - TK: ${item.accountNumber}`;
+      }
+      
+      if (item.updateDate) {
+        message += ` (_${item.updateDate}_)`;
+      }
+      
+      if (item.note) {
+        message += `\n    _${item.note}_`;
+      }
+      
+      message += `\n`;
+    });
+  });
+
+  message += `\n*Tổng tiết kiệm\: ${formatCurrency(savingData.totalBalance)}*\n`;
+
+  return message;
+}
+
 //định dạng số dư tài khoản ngân hàng để hiển thị
 function formatBankAccountBalances(balanceData) {
   if (!balanceData.success) {
@@ -777,41 +1008,43 @@ function formatBankAccountBalances(balanceData) {
   }
 
   let message = "🏦*Số dư tài khoản ngân hàng*\n";
-  message += "\-" .repeat(15) + "\n";
+  message += "\\-" .repeat(15) + "\n";
 
   if (balanceData.bankBalances.length === 0) {
     message += "_Không có dữ liệu số dư tài khoản ngân hàng_\n";
-    return message;
+  } else {
+    // Group display names mapping, exclude "Quỹ mục tiêu" and "Tiết kiệm" as they do not have email notifications
+    const groupDisplayNames = {
+      "Chi phí cố định": "🏡Chi phí cố định",
+      "Chi phí biến đổi": "🛒Chi phí biến đổi", 
+      "Quỹ gia đình": "🛟Quỹ gia đình",
+    };
+
+    balanceData.bankBalances.forEach(account => {
+      const displayName = groupDisplayNames[account.groupName] || account.groupName;
+      
+      message += `*${displayName}*: `;
+      message += ` *${formatCurrency(account.bankBalance)}*`;  
+      
+      if (account.accountNumber) {
+        message += ` trong TK số: ${account.accountNumber}.`;
+      }
+      
+      if (account.updateDate) {
+        message += ` _Cập nhật: ${account.updateDate}_\n\n`;
+      }
+    });
   }
 
-  // Group display names mapping, exclude "Quỹ mục tiêu" and "Tiết kiệm" as they do not have email notifications
-  const groupDisplayNames = {
-    "Chi phí cố định": "🏡Chi phí cố định",
-    "Chi phí biến đổi": "🛒Chi phí biến đổi", 
-    "Quỹ gia đình": "🛟Quỹ gia đình",
-  };
-
-  balanceData.bankBalances.forEach(account => {
-    const displayName = groupDisplayNames[account.groupName] || account.groupName;
-    
-    message += `*${displayName}*: `;
-    message += ` *${formatCurrency(account.bankBalance)}*`;  
-    
-    if (account.accountNumber) {
-      message += ` trong TK số: ${account.accountNumber}.`;
-    }
-    
-    if (account.updateDate) {
-      message += ` _Cập nhật: ${account.updateDate}_\n\n`;
-    }
-  });
-
-  //message += "=" .repeat(35) + "\n";
-  //message += `**Tổng số dư TK: €${balanceData.totalBankBalance.toFixed(2)}**\n`;
+  // Add saving breakdown if available
+  if (balanceData.savingBreakdown && balanceData.savingBreakdown.success) {
+    message += formatSavingBreakdown(balanceData.savingBreakdown);
+  }
 
   return message;
 }
 
+//cập nhật số dư tài khoản ngân hàng
 //cập nhật số dư tài khoản ngân hàng
 function updateBankAccountBalance(accountNumber, newBalance, updateDate) {
   try {
@@ -861,7 +1094,7 @@ function updateBankAccountBalance(accountNumber, newBalance, updateDate) {
     
     for (let i = startRow; i < values.length; i++) {
       const row = values[i];
-      const rowAccountNumber = row[3] || ''; // Column D: Account Number
+      const rowAccountNumber = row[4] || ''; // Column I: Account Number
       
       if (rowAccountNumber && rowAccountNumber.toString().trim() === accountNumber.toString().trim()) {
         foundRow = i;        
@@ -882,10 +1115,18 @@ function updateBankAccountBalance(accountNumber, newBalance, updateDate) {
     // Column 2: Bank Account Balance, Column 5: Update Date
     sheet = namedRange.getSheet ();
     sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+1).setValue(formattedBalance); // 2nd column: Balance    
-    sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+4).setValue(formattedDate); // 5th column: Update Date
+    sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+5).setValue(formattedDate); // 5th column: Update Date
 
     // Calculate difference
-    const difference = sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+2).getValue();
+    const difference = sheet.getRange(namedRange.getRow()+foundRow, namedRange.getColumn()+3).getValue();
+    if (difference > 0) {
+      warning = `👉 *Dư ${formatCurrency(difference)}* so với dự toán. Cân nhắc chuyển vào quỹ hay tiết kiệm.`;
+    } else if (difference < 0) {
+      warning = `⚠️ *Thiếu ${formatCurrency(Math.abs(difference))}* so với dự toán. Cân nhắc bổ sung thêm.`;
+    } else {
+      warning = `✅ Đủ với dự toán.`;
+    }
+
     
     return {
       success: true,
@@ -895,9 +1136,9 @@ function updateBankAccountBalance(accountNumber, newBalance, updateDate) {
       difference: difference,
       groupName: groupName,
       updateDate: formattedDate,
-      message: `✅Số dư TK _#${accountNumber}_ dùng cho*${groupName}*\n💰 Từ: ${formatCurrency(currentBalance)} → ${formatCurrency(formattedBalance)}\n🧮Tiền mặt vs. dự chi: ${formatCurrency(difference)}`
+      message: `✍️ Số dư TK dùng cho *${groupName}*\n💰 Từ: ${formatCurrency(currentBalance)} → ${formatCurrency(formattedBalance)}\n ${warning}`
     };
-    
+
   } catch (error) {
     return {
       success: false,

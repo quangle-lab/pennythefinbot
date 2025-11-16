@@ -136,6 +136,9 @@ function consultDataAnalysticsAgent(consultPrompts) {
               case "getBankAccountBalances":
                 functionResult = getBankAccountBalances();
                 break;
+              case "getSavingBreakdown":
+                functionResult = getSavingBreakdown();
+                break;
               case "updateBankAccountBalance":
                 functionResult = updateBankAccountBalance(functionArgs.accountNumber, functionArgs.balance, functionArgs.date);
                 break;

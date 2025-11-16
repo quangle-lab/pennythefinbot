@@ -1,3 +1,41 @@
+function testGetFundBalances() {
+  Logger.log("🧪 Testing Get Fund Balances...");
+  const result = getFundBalances();
+  Logger.log(formatFundBalances(result));  
+  sendTelegramMessage(formatFundBalances(result));
+  return result.success;
+}
+
+function testGetFundBalancesWithType() {
+  Logger.log("🧪 Testing Get Fund Balances with Type...");
+  const result1 = getFundBalances("rainy");
+  const result2 = getFundBalances("target");
+  const result3 = getFundBalances("saving");
+  Logger.log(formatFundBalances(result1));
+  Logger.log(formatFundBalances(result2));
+  Logger.log(formatFundBalances(result3));  
+  sendTelegramMessage((formatFundBalances(result1)));
+  sendTelegramMessage((formatFundBalances(result2)));
+  sendTelegramMessage((formatFundBalances(result3)));  
+  return result1.success && result2.success && result3.success;
+} 
+
+function testGetBankAccountBalances() {
+  Logger.log("🧪 Testing Get Bank Account Balances...");
+  const result = getBankAccountBalances();
+  Logger.log(formatBankAccountBalances(result));
+  sendTelegramMessage((formatBankAccountBalances(result)));
+  return result.success;
+}
+
+function testGetSavingBreakdown() {
+  Logger.log("🧪 Testing Get Saving Breakdown...");
+  const result = getSavingBreakdown();
+  Logger.log(formatSavingBreakdown(result));
+  sendTelegramMessage((formatSavingBreakdown(result)));
+  return result.success;
+}
+
 //run all tests
 function runAllTests() {
   console.log("🚀 Starting Complete Test Suite");

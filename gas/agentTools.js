@@ -64,7 +64,7 @@ tools =[
   {
     "type": "function",
     "name": "getFundBalances",
-    "description": "Get fund balances for specific fund types or all funds. This doesn not include the bank account balances for fix and variable expenses",
+    "description": "Get fund balances for specific fund types or all funds from the unified stats_BalanceOverview range. This does not include the bank account balances for fixed and variable expenses. Returns data for Quỹ gia đình (rainy/family), Quỹ mục đích (target), and Tiết kiệm (saving) funds with cash available, planned amount, gap, target amount, account number, and update date.",
     "strict": true,
     "parameters": {
       "type": "object",
@@ -73,11 +73,12 @@ tools =[
           "type": "string",
           "enum": [
             "rainy",
+            "family",
             "target",
             "saving",
             "all"
           ],
-          "description": "Fund type: 'rainy' for family fund, 'target' for purpose fund, 'saving' for savings, 'all' for all funds"
+          "description": "Fund type: 'rainy' or 'family' for family fund (Quỹ gia đình), 'target' for purpose fund (Quỹ mục đích), 'saving' for savings (Tiết kiệm), 'all' for all funds"
         }
       },
       "additionalProperties": false,
@@ -212,7 +213,19 @@ tools =[
   {
     "type": "function",
     "name": "getBankAccountBalances",
-    "description": "Retrieve the real bank account balances data to compare with the calculated the to spend",
+    "description": "Retrieve the real bank account balances data from stats_BalanceOverview range for spending groups (Chi phí cố định, Chi phí biến đổi, Quỹ gia đình) and also includes detailed saving breakdown from stats_SavingBreakdown range showing savings by type (cash, forex, coin, etf, etc.) with balances, account numbers, forex balances, and update dates.",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false,
+      "required": []
+    }
+  },
+  {
+    "type": "function",
+    "name": "getSavingBreakdown",
+    "description": "Get detailed breakdown of savings from stats_SavingBreakdown range, showing savings by type (cash, forex, coin, etf, etc.) with individual balances, account numbers, forex balances if available, update dates, and notes. For Cash type, the balance should match with the saving row in the overview balance.",
     "strict": true,
     "parameters": {
       "type": "object",
