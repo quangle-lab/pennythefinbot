@@ -615,17 +615,30 @@ function formatTelegramMessage(message, options = {}) {
 /**
  * Create all required triggers for the Penny Finance Bot
  * This function creates triggers for automated tasks
+ * Supports webhook mode: if webhook is configured, polling trigger is optional
  */
 function createTriggers() {
   try {
     // Delete existing triggers first to avoid duplicates
     deleteAllTriggers();
     
-    // Trigger 1: Check Telegram messages every minute
-    ScriptApp.newTrigger('checkTelegramMessages')
-      .timeBased()
-      .everyMinutes(1)
-      .create();
+    // Check if webhook is configured
+    const props = PropertiesService.getScriptProperties();
+    const webhookUrl = props.getProperty('telegram_webhookUrl');
+    const usePolling = props.getProperty('telegram_usePolling');
+    
+    // Trigger 1: Check Telegram messages every minute (only if webhook not configured or polling explicitly enabled)
+    // If webhook is set up, this serves as a fallback/backup mechanism
+    // You can disable polling by setting telegram_usePolling to 'false' in ScriptProperties
+    if (!webhookUrl || usePolling === 'true') {
+      ScriptApp.newTrigger('checkTelegramMessagesPolling')
+        .timeBased()
+        .everyMinutes(1)
+        .create();
+      Logger.log('Polling trigger created (webhook not configured or polling enabled)');
+    } else {
+      Logger.log('Skipping polling trigger (webhook is configured and polling is disabled)');
+    }
     
     // Trigger 2: Process bank alerts every 10 minutes
     ScriptApp.newTrigger('processBankAlerts')
@@ -651,7 +664,9 @@ function createTriggers() {
     Logger.log('All triggers created successfully');
     return {
       success: true,
-      message: 'All triggers created successfully'
+      message: 'All triggers created successfully',
+      webhookMode: !!webhookUrl,
+      pollingEnabled: !webhookUrl || usePolling === 'true'
     };
     
   } catch (error) {

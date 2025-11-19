@@ -1,3 +1,26 @@
+function webhookStatus () {
+  const info = getTelegramWebhookInfo();
+  Logger.log("Pending updates: " + info.pendingUpdateCount);
+}
+
+function webhookSetup () {
+  // Get your deployed web app URL from Step 1
+  const webhookUrl = "https://script.google.com/macros/s/AKfycby6YKqQ9F9KpHuHkH8q0ms73zagEFK98o9c3sd2IXIWTPPRxxkqIKE2EaHWeT8TO2GC/exec"; // e.g., "https://script.google.com/macros/s/.../exec"
+
+  // Setup webhook with automatically generated secret token
+  const result = setupTelegramWebhookWithSecret(webhookUrl);
+
+  // Check results
+  if (result.success) {
+    Logger.log("✅ Webhook setup successful!");
+    Logger.log("Webhook URL: " + result.webhookUrl);
+    Logger.log("Secret Token: " + result.secretToken); // Save this token securely
+    Logger.log("Description: " + result.description);
+  } else {
+    Logger.log("❌ Webhook setup failed: " + result.error);
+  }
+}
+
 function testGetFundBalances() {
   Logger.log("🧪 Testing Get Fund Balances...");
   const result = getFundBalances();
