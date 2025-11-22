@@ -26,6 +26,7 @@ function createBudgetSelectively(newMonthText, sourceMonthText) {
     const category = row[2];
     const amount = row[3];
     const note = row[4];
+    const isActive = row[5];
 
     if (rowMonthText === newMonthText) {
       existingBudgetLines.push({
@@ -50,13 +51,15 @@ function createBudgetSelectively(newMonthText, sourceMonthText) {
     const category = row[2];
     const amount = row[3];
     const note = row[4];
+    const isActive = row[5];
 
     if (rowMonthText === sourceMonthText) {
       sourceMonthItems.push({
         group: group,
         category: category,
         amount: amount,
-        note: note || ''
+        note: note || '', 
+        isActive: isActive
       });
 
       // Only add to creation list if category doesn't exist in new month
@@ -65,7 +68,8 @@ function createBudgetSelectively(newMonthText, sourceMonthText) {
           group: group,
           category: category,
           amount: Math.round(amount*100)/100,  
-          note: ''
+          note: '', 
+          isActive: isActive
         });
       }
     }
@@ -83,7 +87,7 @@ function createBudgetSelectively(newMonthText, sourceMonthText) {
   if (newItemsToCreate.length > 0) {
     const newRows = [];
     newItemsToCreate.forEach(item => {
-      const newRow = [newMonthText, item.group, item.category, item.amount, item.note];
+      const newRow = [newMonthText, item.group, item.category, item.amount, item.note, item.isActive];
       newRows.push(newRow);
     });
 
@@ -129,7 +133,7 @@ function createBudgetSelectively(newMonthText, sourceMonthText) {
 }
 
 //thay đổi budget
-function setBudgetChange(month, group, category, amount, note) {
+function setBudgetChange(month, group, category, amount, note, isActive) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('💶Dự toán');
   if (!sheet) {
     Logger.log("Sheet '💶Dự toán' not found.");
@@ -150,12 +154,13 @@ function setBudgetChange(month, group, category, amount, note) {
     if (rowMonth === month && groupCell === group && categoryCell === category) {
       sheet.getRange(i + 1, 4).setValue(amount);  // Column D = amount
       sheet.getRange(i + 1, 5).setValue(note);    // Column E = ghi chú
+      sheet.getRange(i + 1, 6).setValue(isActive); // Column F = isActive
       return `✅ Đã cập nhật dự toán tháng ${rowMonth} cho *${category}* \(${group}\)\: ${formatCurrency(amount)}`; // Stop after first match
     }
   }
 
   // Nếu chưa có, thêm mới  
-  sheet.appendRow([month, group, category, amount, note]);
+  sheet.appendRow([month, group, category, amount, note, isActive]);
   return `➕ Đã thêm dự toán tháng ${month} cho *${category}* \(${group}\)\: ${formatCurrency(amount)}`;
 }
 
@@ -178,6 +183,7 @@ function getBudgetData (monthText) {
     const tab = row[1];
     const category = row[2];
     const budget = row[3];
+    const isActive = row[5];
     if (!summary[tab]) summary[tab] = [];
     summary[tab].push(`- ${category}: ${formatCurrency(budget)}`);
   });
@@ -1777,52 +1783,7 @@ function formatSearchResults(searchData) {
 
 //---------------CONTEXT-------------------//
 //lấy danh sách các nhóm và mục giao dịch
-function getTxCat() {
-  const namedRanges = [
-    "ThuNhap",
-    "ChiPhiCoDinh",
-    "ChiPhiBienDoi",
-    "QuyGiaDinh",
-    "QuyMucDich",
-    "TietKiem"
-  ];
-
-  const catTxSheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-
-  const promptParts = [];
-  promptParts.push("## Các nhóm/mục giao dịch");
-
-  namedRanges.forEach((rangeName, index) => {
-    const namedRange = catTxSheet.getRangeByName(rangeName);
-    if (!namedRange) return;
-
-    const sheet = namedRange.getSheet();
-    const startRow = namedRange.getRow();    
-    const numRows = namedRange.getNumRows();
-
-    // Mở rộng từ cột A đến C => width = 3
-    const fullRange = sheet.getRange(startRow, 1, numRows, 3);
-    const values = fullRange.getValues();
-
-    // Lấy tên nhóm từ cột A (duy nhất trong đoạn này)
-    const uniqueGroupNames = [...new Set(values.map(row => row[0]).filter(name => !!name))];
-    const groupName = uniqueGroupNames[0] || rangeName;
-
-    const items = [];
-    values.forEach(([, muc, mieuta]) => {
-      if (muc && mieuta) {
-        items.push(`  ${muc}: ${mieuta}`);
-      }
-    });
-
-    if (items.length > 0) {
-      promptParts.push(`\n### ${groupName}:\n${items.join('\n')}`);
-    }
-  });
-  
-  const instructionCatPrompt = promptParts.join("\n");
-  return instructionCatPrompt;
-}
+//Function moved to gas/categories/dataCategories.js
 
 //lấy hoàn cảnh gia đình
 function getFamilyContext() {

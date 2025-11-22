@@ -46,6 +46,21 @@ function handleIntent(intentObj, originalText, replyText, projectContext = null)
       case "projectReport":
         return handleProjectReport(intentObj);
 
+      case "listCategories":
+        return handleListCategories(intentObj);
+
+      case "activateCategory":
+        return handleActivateCategory(intentObj);
+
+      case "deactivateCategory":
+        return handleDeactivateCategory(intentObj);
+
+      case "addCategory":
+        return handleAddCategory(intentObj);
+
+      case "updateCategoryDescription":
+        return handleUpdateCategoryDescription(intentObj);
+
       case "others":
       default:
         return handleOthers(intentObj);
@@ -497,7 +512,8 @@ function handleModifyBudget(intentObj) {
       const group = change.group;
       const note = change["ghi chú"];
       const amount = change.amount;
-      const result = setBudgetChange(month, group, category, amount, note);
+      const isActive = change.isActive;
+      const result = setBudgetChange(month, group, category, amount, note, isActive);    
       results.push(result);
     });
     
@@ -788,6 +804,207 @@ function handleProjectReport(intentObj) {
       success: false,
       messages: [`❌ Lỗi khi xử lý báo cáo dự án: ${error.toString()}`],
       logs: [`Error in handleProjectReport: ${error.toString()}`]
+    };
+  }
+}
+
+//---------------CATEGORY MANAGEMENT HANDLERS-------------------//
+
+//xử lý intent listCategories - liệt kê tất cả categories và groups
+function handleListCategories(intentObj) {
+  try {
+    const groupsMap = getAllCategoriesList(true); // Include inactive categories
+    
+    if (!groupsMap || groupsMap.size === 0) {
+      return {
+        success: true,
+        messages: ["📋 **Danh sách các nhóm và mục trong dự toán:**\n\nHiện chưa có nhóm và mục nào được cấu hình."],
+        logs: ["No categories found"]
+      };
+    }
+
+    // Convert map to array format for processing
+    const groups = [];
+    let totalCategories = 0;
+    
+    groupsMap.forEach((categories, groupName) => {
+      groups.push({
+        groupName: groupName,
+        categories: categories
+      });
+      totalCategories += categories.length;
+    });
+
+    // Format the message
+    let message = "📋 **Danh sách các nhóm và mục trong dự toán:**\n\n";
+    
+    groups.forEach(group => {
+      message += `\n**${group.groupName}**\n`;
+      
+      const activeCategories = group.categories.filter(cat => cat.isActive);
+      const inactiveCategories = group.categories.filter(cat => !cat.isActive);
+      
+      if (activeCategories.length > 0) {
+        message += "✅ *Đang hoạt động:*\n";
+        activeCategories.forEach(cat => {
+          const desc = cat.description ? ` - ${cat.description}` : '';
+          message += `  • ${cat.category}${desc}\n`;
+        });
+      }
+      
+      if (inactiveCategories.length > 0) {
+        message += "❌ *Đã vô hiệu hóa:*\n";
+        inactiveCategories.forEach(cat => {
+          const desc = cat.description ? ` - ${cat.description}` : '';
+          message += `  • ${cat.category}${desc}\n`;
+        });
+      }
+      
+      message += "\n";
+    });
+    
+    message += `\n_Tổng cộng: ${groups.length} nhóm, ${totalCategories} mục_`;
+
+    return {
+      success: true,
+      messages: [message],
+      logs: [`Listed ${groups.length} groups with ${totalCategories} categories`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi liệt kê categories: ${error.toString()}`],
+      logs: [`Error in handleListCategories: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent activateCategory - kích hoạt một category
+function handleActivateCategory(intentObj) {
+  try {
+    const group = intentObj.group;
+    const category = intentObj.category;
+
+    if (!group || !category) {
+      return {
+        success: false,
+        messages: ["❌ Thiếu thông tin nhóm hoặc mục cần kích hoạt"],
+        logs: ["Missing group or category in activateCategory intent"]
+      };
+    }
+
+    const result = activateCategory(group, category);
+    
+    return {
+      success: result.success,
+      messages: [result.success ? result.message : result.error],
+      logs: [result.success ? `Activated category: ${category} in group: ${group}` : `Failed to activate: ${result.error}`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi kích hoạt mục: ${error.toString()}`],
+      logs: [`Error in handleActivateCategory: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent deactivateCategory - vô hiệu hóa một category
+function handleDeactivateCategory(intentObj) {
+  try {
+    const group = intentObj.group;
+    const category = intentObj.category;
+
+    if (!group || !category) {
+      return {
+        success: false,
+        messages: ["❌ Thiếu thông tin nhóm hoặc mục cần vô hiệu hóa"],
+        logs: ["Missing group or category in deactivateCategory intent"]
+      };
+    }
+
+    const result = deactivateCategory(group, category);
+    
+    return {
+      success: result.success,
+      messages: [result.success ? result.message : result.error],
+      logs: [result.success ? `Deactivated category: ${category} in group: ${group}` : `Failed to deactivate: ${result.error}`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi vô hiệu hóa mục: ${error.toString()}`],
+      logs: [`Error in handleDeactivateCategory: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent addCategory - thêm category mới vào group
+function handleAddCategory(intentObj) {
+  try {
+    const group = intentObj.group;
+    const category = intentObj.category;
+    const description = intentObj.description || '';
+    // Convert priority (1/0) to isActive (boolean) if provided, default to true
+    const isActive = intentObj.isActive !== undefined ? intentObj.isActive : 
+                     (intentObj.priority !== undefined ? (intentObj.priority > 0) : true);
+
+    if (!group || !category) {
+      return {
+        success: false,
+        messages: ["❌ Thiếu thông tin nhóm hoặc tên mục cần thêm"],
+        logs: ["Missing group or category in addCategory intent"]
+      };
+    }
+
+    const result = addCategoryToGroup(group, category, description, isActive);
+    
+    return {
+      success: result.success,
+      messages: [result.success ? result.message : result.error],
+      logs: [result.success ? `Added category: ${category} to group: ${group}` : `Failed to add category: ${result.error}`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi thêm mục: ${error.toString()}`],
+      logs: [`Error in handleAddCategory: ${error.toString()}`]
+    };
+  }
+}
+
+//xử lý intent updateCategoryDescription - cập nhật mô tả của category
+function handleUpdateCategoryDescription(intentObj) {
+  try {
+    const group = intentObj.group;
+    const category = intentObj.category;
+    const description = intentObj.description || '';
+
+    if (!group || !category) {
+      return {
+        success: false,
+        messages: ["❌ Thiếu thông tin nhóm hoặc mục cần cập nhật mô tả"],
+        logs: ["Missing group or category in updateCategoryDescription intent"]
+      };
+    }
+
+    const result = updateCategoryDescription(group, category, description);
+    
+    return {
+      success: result.success,
+      messages: [result.success ? result.message : result.error],
+      logs: [result.success ? `Updated description for category: ${category} in group: ${group}` : `Failed to update description: ${result.error}`]
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      messages: [`❌ Lỗi khi cập nhật mô tả: ${error.toString()}`],
+      logs: [`Error in handleUpdateCategoryDescription: ${error.toString()}`]
     };
   }
 }

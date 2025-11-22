@@ -169,8 +169,33 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         - Hỏi: tìm tất cả giao dịch ăn uống tháng 11
         - Hỏi: tìm giao dịch có từ "uber" trong tháng này
         - Hỏi: tìm giao dịch từ 01/11 đến 30/11 trong nhóm chi phí biến đổi
-        - others: các intent khác, kèm theo ghi chú trong mục note
-          Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, tư vấn tài chính (bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân), và tìm kiếm giao dịch
+    - listCategories: liệt kê tất cả các nhóm và mục hiện có trong dự toán, bao gồm trạng thái hoạt động/vô hiệu hóa
+      - Ví dụ
+        - "Cho tôi xem tất cả các mục trong dự toán"
+        - "Liệt kê các nhóm và mục tôi có"
+        - "Hiển thị danh sách categories"
+    - activateCategory: kích hoạt một mục đã tồn tại để sử dụng trong dự toán
+      - Ví dụ
+        - "Kích hoạt mục Ăn uống trong nhóm Chi phí biến đổi"
+        - "Bật lại mục Internet"
+        - "Kích hoạt mục Du lịch"
+    - deactivateCategory: vô hiệu hóa một mục để không sử dụng trong dự toán
+      - Ví dụ
+        - "Vô hiệu hóa mục Ăn uống trong nhóm Chi phí biến đổi"
+        - "Tắt mục Internet"
+        - "Vô hiệu hóa mục Du lịch"
+    - addCategory: thêm một mục mới vào một nhóm
+      - Ví dụ
+        - "Thêm mục Cafe vào nhóm Chi phí biến đổi"
+        - "Tạo mục mới tên Giải trí trong nhóm Chi phí biến đổi với mô tả Chi phí giải trí"
+        - "Thêm mục Lãi suất vào nhóm Thu nhập, mô tả là Thu nhập từ lãi suất"
+    - updateCategoryDescription: cập nhật mô tả của một mục đã tồn tại
+      - Ví dụ
+        - "Cập nhật mô tả mục Ăn uống trong nhóm Chi phí biến đổi thành Chi phí ăn uống hàng ngày"
+        - "Thay đổi mô tả mục Internet thành Chi phí internet hàng tháng"
+        - "Sửa mô tả mục Du lịch trong nhóm Chi phí biến đổi thành Chi phí du lịch và nghỉ dưỡng"
+    - others: các intent khác, kèm theo ghi chú trong mục note
+      Nếu không xác định được ý định, hãy hỏi khách hàng rõ hơn về ý định của họ. Ngoài ra, chỉ rõ hiện tại bạn hỗ trợ ghi chép và chỉnh sửa giao dịch, lập báo cáo chi tiêu, tạo và chỉnh sửa dự toán cho tháng, quản lý categories (liệt kê, kích hoạt/vô hiệu hóa, thêm mới), tư vấn tài chính (bao gồm kiểm tra khả năng chi trả và coaching tài chính cá nhân), và tìm kiếm giao dịch
           
   ## Tin nhắn nhiều ý định
   Trong một tin nhắn của khách hàng có thể có nhiều ý định:
@@ -233,6 +258,7 @@ function generateIntentDetectionPrompt (originalText, replyText) {
             "category":"mục trong từng nhóm". Sử dụng đúng tên mục như trong Chỉ dẫn phân loại bao gồm cả emoji.
             "amount":"số tiền dự toán theo định dạng XXXX.XX (bỏ dấu + hay - nếu cần thiết), số tiền này có thể hoàn toàn do khách hàng đề xuất hoặc là cộng dồn của dự toán hiện tại và bổ sung thêm từ khách hàng", 
             "ghi chú":"ghi chú của khách hàng về mục dự toán này cho tháng"
+            "isActive":"1 nếu mục dự toán này vẫn còn hiệu lực, 0 nếu mục dự toán này không còn hiệu lực"
           }
         ]
       }
@@ -267,6 +293,47 @@ function generateIntentDetectionPrompt (originalText, replyText) {
         "categories":["danh sách tên mục cần tìm kiếm trong nhóm. Để trống nếu tìm tất cả mục"],
         "keywords":["danh sách từ khóa cần tìm trong miêu tả và ghi chú giao dịch. Để trống nếu không có từ khóa cụ thể"],
         "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu tìm kiếm của khách hàng"
+      }
+
+    ### Yêu cầu liệt kê categories
+      {
+        "intent":"listCategories",
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng"
+      }
+
+    ### Yêu cầu kích hoạt mục
+      {
+        "intent":"activateCategory",
+        "group":"tên nhóm, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji",
+        "category":"tên mục cần kích hoạt, tuân thủ tuyệt đối tên mục trong danh sách",
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng"
+      }
+
+    ### Yêu cầu vô hiệu hóa mục
+      {
+        "intent":"deactivateCategory",
+        "group":"tên nhóm, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji",
+        "category":"tên mục cần vô hiệu hóa, tuân thủ tuyệt đối tên mục trong danh sách",
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng"
+      }
+
+    ### Yêu cầu thêm mục mới
+      {
+        "intent":"addCategory",
+        "group":"tên nhóm, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji",
+        "category":"tên mục mới cần thêm, tự xác định emoji dựa trên miêu tả của mục mới",
+        "description":"mô tả cho mục mới (tùy chọn, để trống nếu không có)",
+        "isActive":true,
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng"
+      }
+
+    ### Yêu cầu cập nhật mô tả mục
+      {
+        "intent":"updateCategoryDescription",
+        "group":"tên nhóm, tuân thủ tuyệt đối tên nhóm trong danh sách, cả chữ lẫn emoji",
+        "category":"tên mục cần cập nhật mô tả, tuân thủ tuyệt đối tên mục trong danh sách",
+        "description":"mô tả mới cho mục (có thể để trống nếu muốn xóa mô tả)",
+        "confirmation":"tin nhắn xác nhận hiểu và đang thực hiện yêu cầu của khách hàng"
       }
 
     ### Yêu cầu khác ngoài danh sách phân loại

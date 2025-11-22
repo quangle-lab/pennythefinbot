@@ -1,6 +1,10 @@
 // Utility functions for Penny the Finance Bot
 // Core utility functions for image processing, data formatting, and common operations
 
+function getSheetName() {
+  return SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getName();
+}
+
 /**
  * Convert image blob to base64 string
  * @param {Blob} photoBlob - The image blob to convert
@@ -661,12 +665,24 @@ function createTriggers() {
       .atHour(8)
       .create();
     
+    // Trigger 5: Monitor webhook status every 15 minutes (only if webhook is configured)
+    if (webhookUrl) {
+      ScriptApp.newTrigger('monitorWebhookStatus')
+        .timeBased()
+        .everyMinutes(15)
+        .create();
+      Logger.log('Webhook monitoring trigger created (every 15 minutes)');
+    } else {
+      Logger.log('Skipping webhook monitoring trigger (webhook not configured)');
+    }
+    
     Logger.log('All triggers created successfully');
     return {
       success: true,
       message: 'All triggers created successfully',
       webhookMode: !!webhookUrl,
-      pollingEnabled: !webhookUrl || usePolling === 'true'
+      pollingEnabled: !webhookUrl || usePolling === 'true',
+      webhookMonitoringEnabled: !!webhookUrl
     };
     
   } catch (error) {

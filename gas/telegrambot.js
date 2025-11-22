@@ -344,7 +344,7 @@ function sendLog (message) {
   const payload = {    
     chat_id: logChannel,
     parse_mode: `MarkdownV2`,
-    text: message,
+    text: convertToMarkdownV2(message),
   };
   var response = UrlFetchApp.fetch(`${TELEGRAM_API_URL}/sendMessage`, {
     method: 'POST',
@@ -352,6 +352,8 @@ function sendLog (message) {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   });  
+
+  Logger.log (response);
 }
 
 //send weekly report
@@ -834,6 +836,100 @@ function regenerateWebhookSecretToken(tokenLength = 32) {
     return {
       success: false,
       error: `Failed to regenerate secret token: ${error.toString()}`
+    };
+  }
+}
+
+//========= WEBHOOK MONITORING =========//
+
+/**
+ * Monitor webhook status and send report to Telegram log channel
+ * This function is called by a scheduled trigger to monitor webhook health
+ * @returns {Object} - Result object with monitoring status
+ */
+function monitorWebhookStatus() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const webhookUrl = props.getProperty('telegram_webhookUrl');
+    
+    // Check if webhook is configured
+    if (!webhookUrl) {
+      const message = `🔍 Webhook Monitor\n\n⚠️ Webhook is not configured. Bot is using polling mode`;
+      sendLog(message);
+      return {
+        success: true,
+        message: 'Webhook not configured, monitoring skipped'
+      };
+    }
+    
+    // Get webhook information from Telegram
+    const webhookInfo = getTelegramWebhookInfo();
+    
+    if (!webhookInfo.success) {
+      const message = `🔍 Webhook Monitor\n\n❌ Error checking webhook status:\n${webhookInfo.error || 'Unknown error'}`;
+      sendLog(message);
+      return {
+        success: false,
+        error: webhookInfo.error
+      };
+    }
+    
+    // Build status message (plain text, will be converted to MarkdownV2)
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
+    let statusMessage = `*🔍 Webhook Monitor at ${timestamp}\n*`;
+    
+    // Webhook status
+    if (webhookInfo.isSet && webhookInfo.url) {
+      statusMessage += `✅ Active\n`;
+      const urlPreview = webhookInfo.url.substring(0, 50) + '<truncated>';
+      statusMessage += `📍 URL: ${urlPreview}\n`;
+    } else {
+      statusMessage += `❌ Webhook Not Set\n`;
+    }
+    
+    // Pending updates
+    statusMessage += `⚠️ Pending Updates: ${webhookInfo.pendingUpdateCount}\n`;          
+    
+    // Last error (if any)
+    if (webhookInfo.lastErrorMessage) {
+      const errorDate = webhookInfo.lastErrorDate 
+        ? Utilities.formatDate(new Date(webhookInfo.lastErrorDate * 1000), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss")
+        : "Unknown";
+      statusMessage += `❌ Last Error:\n`;
+      statusMessage += `Time: ${errorDate}\n`;
+      statusMessage += `Message: ${webhookInfo.lastErrorMessage}\n`;
+    } else {
+      statusMessage += `✅ No Recent Errors\n`;
+    }
+    
+    // Additional info
+    if (webhookInfo.hasCustomCertificate) {
+      statusMessage += `🔒 Custom Certificate: Yes\n`;
+    }
+    
+    if (webhookInfo.maxConnections) {
+      statusMessage += `📊 Max Connections: ${webhookInfo.maxConnections}\n`;
+    }
+    
+    // Convert to MarkdownV2 and send log to Telegram
+    sendLog(statusMessage);
+    
+    // Log to Apps Script logger
+    Logger.log(`Webhook monitoring completed: ${webhookInfo.isSet ? 'Active' : 'Not Set'}, Pending: ${webhookInfo.pendingUpdateCount}`);
+    
+    return {
+      success: true,
+      webhookInfo: webhookInfo,
+      message: 'Webhook status monitored and logged'
+    };
+    
+  } catch (error) {
+    Logger.log(`Error monitoring webhook status: ${error.toString()}`);
+    const errorMessage = `🔍 Webhook Monitor\n\n❌ Error:\n${error.toString()}`;
+    sendLog(errorMessage);
+    return {
+      success: false,
+      error: `Failed to monitor webhook: ${error.toString()}`
     };
   }
 }
